@@ -57,7 +57,7 @@ class GameContext(BaseModel):
     )
 
 
-class NPContext(BaseModel):
+class NPCContext(BaseModel):
     """Full description of an NPC (Non-Player Character).
 
     Contains both biographical/personality information and the current
@@ -83,5 +83,5 @@ class NPContext(BaseModel):
     backstory: Optional[str] = Field(None, description="Backstory of the NPC.")
     language: Optional[List[str]] = Field(
         None,
-        description="Languages spoken by the NPC. Defaults to the configuration's default language if not specified."
+        description="Languages spoken by the NPC. Defaults to the configuration's default language if not specified." # TODO: Set default language in game context from CONFIG
     )
