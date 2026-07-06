@@ -32,6 +32,7 @@ class Orchestrator:
         if self._initialized:
             return
         self.pre_processor = pre_processor or PreProcessor()
+        self.contract_builder = ContractBuilder()
         self.llm_handler = llm_handler or LLMHandler()
         self._initialized = True
 
@@ -60,5 +61,6 @@ class Orchestrator:
     def generate_dialogue(self, name: str, intent: str, description: str) -> dict[str, Any]:
         """Generate NPC dialogue using the NPC and game context."""
         npc_context: dict[str, Any] = self.pre_processor.validate_NPC_context(name, intent, description)
-        llm_handler_result: dict[str, Any] = self.llm_handler.call(npc_context, self.game_context)
+        contract = self.contract_builder.build(self.game_context, npc_context)
+        llm_handler_result: dict[str, Any] = self.llm_handler.call(contract)
         return llm_handler_result

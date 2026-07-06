@@ -1,4 +1,6 @@
-from core.contexts import *
+from typing import Optional
+
+from core.models.contexts import GameContext, KeyDialogue, NPCContext, QuestDialogue
 from enum import Enum
 
 # Semantic constraints for Game Context (TODO: Move inside CONFIG).

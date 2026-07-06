@@ -1,0 +1,1 @@
+RULES_SYSTEM_PROMPT = """Example rule"""
