@@ -1,7 +1,6 @@
 from typing import Optional
-
 from core.models.contexts import GameContext, KeyDialogue, NPCContext, QuestDialogue
-from enum import Enum
+from tools.errors import PreProcessingError, ValidationErrorCode
 
 # Semantic constraints for Game Context (TODO: Move inside CONFIG).
 MIN_EPOCH_LENGTH = 2
@@ -28,29 +27,6 @@ MAX_QUEST_DESCRIPTION_LENGTH = 3000
 MAX_QUEST_LOCATION_LENGTH = 200
 MAX_QUEST_REWARD_LENGTH = 300
 MAX_KEY_DIALOGUE_LENGTH = 1000
-
-
-class ValidationErrorCode(Enum):
-    """Semantic error codes for preprocessing validation failures."""
-
-    EMPTY_FIELD = "empty_field"
-    FIELD_TOO_LONG = "field_too_long"
-    FIELD_TOO_SHORT = "field_too_short"
-    INVALID_VALUE = "invalid_value"
-
-
-class PreProcessingError(Exception):
-    """Raised when semantic validation of an incoming model fails.
-
-    Carries a machine-readable error code and a list of human-readable
-    field-level error messages, so the API layer can translate this
-    into an appropriate HTTP response without needing domain knowledge.
-    """
-
-    def __init__(self, code: ValidationErrorCode, errors: list[str]):
-        self.code = code
-        self.errors = errors
-        super().__init__(f"[{code.value}] " + "; ".join(errors))
 
 def validate_game_context(context: GameContext) -> GameContext:
     """Validate and normalize a GameContext instance.
