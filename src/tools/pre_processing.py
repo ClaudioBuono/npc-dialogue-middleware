@@ -1,5 +1,5 @@
 from typing import Optional
-from core.models.contexts import GameContext, KeyDialogue, NPCContext, QuestDialogue
+from core.types.contexts import GameContext, KeyDialogue, NPCContext, QuestDialogue
 from tools.errors import PreProcessingError, ValidationErrorCode
 
 # Semantic constraints for Game Context (TODO: Move inside CONFIG).

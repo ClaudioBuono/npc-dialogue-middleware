@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from core.types.contract import Contract
 
 
 class BaseLLMClient(ABC):
@@ -7,7 +8,7 @@ class BaseLLMClient(ABC):
     """
 
     @abstractmethod
-    def generate(self, prompt: str, temperature: float) -> str:
+    def generate(self, contract: Contract, temperature: float) -> str:
         """
         Performs a call to the model and returns the raw response string.
 
@@ -17,6 +18,21 @@ class BaseLLMClient(ABC):
 
         Returns:
             JSON string or raw text returned by the model.
+        """
+        ...
+
+    @abstractmethod
+    def _format_request(self, contract: Contract, temperature: float) -> dict | None:
+        """
+        Formats a contract into a prompt payload for the request.
+
+        Args:
+            contract (Contract): The contract object to be formatted.
+            temperature (float): The sampling temperature to use for generation.
+
+        Returns:
+            dict | None: A dictionary containing the formatted request data,
+                         or `None` if the formatting fails.
         """
         ...
 

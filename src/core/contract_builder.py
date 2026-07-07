@@ -1,7 +1,7 @@
 # core/contract_builder.py
 from typing import Any
-from core.models.contract import Contract
-from core.models.contexts import GameContext, NPCContext
+from core.types.contract import Contract
+from core.types.contexts import GameContext, NPCContext
 from core.llm.system_prompts import RULES_SYSTEM_PROMPT
 
 
