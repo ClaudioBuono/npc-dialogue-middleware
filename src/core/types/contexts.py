@@ -3,28 +3,44 @@ from pydantic import BaseModel, Field
 from enum import Enum
 
 
-class QuestDialogue(BaseModel):
-    """Quest dialogue block.
+class Quest(BaseModel):
+    """Quest block.
 
-    Contains all the information needed to describe a quest
-    that the NPC can assign to the player.
+    Contains the information needed to describe a quest that the NPC
+    can assign to the player.
     """
 
-    name: str = Field(..., description="Name of the quest.")
     objective: str = Field(..., description="Objective the player must accomplish.")
-    description: str = Field(..., description="Narrative description of the quest.")
-    location: str = Field(..., description="Location where the quest takes place or must be completed.")
+    name: Optional[str] = Field(None, description="Name of the quest, if already defined.")
+    description: Optional[str] = Field(None, description="Narrative description of the quest, if already defined.")
+    location: Optional[str] = Field(None, description="Location where the quest takes place or must be completed, if already defined.")
     reward: Optional[str] = Field(None, description="Reward given upon completion of the quest, if any.")
+    generate_accept_refuse: Optional[bool] = Field(
+        False,
+        description="Whether the dialogue options should include the possibility for the "
+                    "player to accept or refuse the quest."
+    )
+    generate_more_opt: Optional[bool] = Field(
+        False,
+        description="Whether additional dialogue options beyond accept/refuse should be "
+                    "generated for this quest (e.g. asking for more details, negotiating terms)."
+    )
 
 
-class KeyDialogue(BaseModel):
-    """Key dialogue block.
+class Dialogue(BaseModel):
+    """Dialogue block, covering both key and simple dialogue cases.
 
-    Used when the NPC must necessarily convey or receive a piece of
-    information that is crucial to the plot, without it being tied to a quest.
+    Used for any NPC interaction that is not a quest. If `must_use` is
+    set, the NPC must necessarily convey that specific piece
+    of information during the conversation.
     """
 
-    must_use: str = Field(..., description="Piece of information the NPC must necessarily communicate or use in the dialogue.")
+    must_use: Optional[str] = Field(None, description="Piece of information the NPC must necessarily communicate or use in the dialogue.")
+    more_info: Optional[str] = Field(
+        None,
+        description="Additional information the dialogue options should be based on when "
+                    "generating them (e.g. context or details to inform the player's choices)."
+    )
 
 
 class Talkativeness(Enum):
@@ -61,7 +77,7 @@ class NPCContext(BaseModel):
     """Full description of an NPC (Non-Player Character).
 
     Contains both biographical/personality information and the current
-    narrative state of the NPC, including its dialogue intent, if any.
+    narrative state of the NPC, including its dialogue intent.
     """
 
     # Required
@@ -69,10 +85,11 @@ class NPCContext(BaseModel):
     age: int = Field(..., description="Age of the character, expressed in whatever format is suitable for the game world.")
     personality: str = Field(..., description="Personality of the NPC.")
     context: str = Field(..., description="Current context of the NPC: location, time of day, weather, and other useful details.")
-    intent: Optional[QuestDialogue | KeyDialogue] = Field(
-        None,
-        description="Dialogue intent of the NPC: can be a Quest, a KeyDialogue, "
-                    "or None in the case of a simple dialogue with no particular purpose."
+    intent: Quest | Dialogue = Field(
+        ...,
+        description="Dialogue intent of the NPC. Use a Quest when the NPC is assigning or "
+                    "discussing a mission. Use a Dialogue for anything else, including plain "
+                    "conversation with no particular narrative purpose."
     )
     talkativeness: Talkativeness = Field(..., description="How much the NPC tends to talk.")
     main_character_relation: str = Field(..., description="Relationship of the NPC with the main character.")
