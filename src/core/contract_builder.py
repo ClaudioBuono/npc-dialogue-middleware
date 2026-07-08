@@ -11,10 +11,23 @@ class ContractBuilder:
     combining game_context and npc_context.
     """
 
-    # Fixed schema: defines the expected shape of the LLM response
+    # Ouput schema 
+    # TODO: To improve making it dynamic, options depend on the intent
     _OUTPUT_SCHEMA: dict[str, Any] = {
-        "dialogue": "string",
-        "player_options": ["string"],
+        "type": "object",
+        "properties": {
+            "dialogue": {
+                "type": "string"
+            },
+            "player_options": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                }
+            }
+        },
+        "required": ["dialogue", "player_options"],
+        "additionalProperties": False
     }
 
     def build(self, game_context: GameContext, npc_context: NPCContext) -> Contract:

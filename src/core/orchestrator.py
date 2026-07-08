@@ -1,8 +1,10 @@
 import logging
 from typing import Any
 from core.contract_builder import ContractBuilder
-from tools.pre_processing import PreProcessor
-from tools.llm_handler import LLMHandler
+from core.dialogue_generator import DialogueGenerator
+from core.llm.openai_client import OpenAICompatibleClient
+from core.types.contexts import GameContext, KeyDialogue, NPCContext, QuestDialogue, Talkativeness
+from tools import pre_processing
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,7 @@ class Orchestrator:
     """
 
     """Holds validated game context for middleware operations."""
-    game_context: dict[str, Any] | None = None
+    game_context: GameContext | None = None
 
     _instance: "Orchestrator | None" = None
 
@@ -28,12 +30,17 @@ class Orchestrator:
             cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self, pre_processor: PreProcessor | None = None, llm_handler: LLMHandler | None = None) -> None:
+    def __init__(self) -> None:
         if self._initialized:
             return
-        self.pre_processor = pre_processor or PreProcessor()
         self.contract_builder = ContractBuilder()
-        self.llm_handler = llm_handler or LLMHandler()
+        self.dialogue_generator = DialogueGenerator(
+            client=OpenAICompatibleClient(
+                endpoint="http://localhost:11434/v1",
+                api_key=None,
+                model_identifier="llama3.2",
+            )
+        )
         self._initialized = True
 
     @classmethod
@@ -54,13 +61,44 @@ class Orchestrator:
 
     # Orchestrator Methods ----------------------------------------------------------------------------
 
-    def set_game_context(self, environment: str, epoch: str, lore: str) -> None:
+    def set_game_context(self, environment: str, epoch: str, plot: str) -> None:
         """Set the game context by validating environment, epoch, and lore."""
-        self.game_context = self.pre_processor.validate_game_context(environment, epoch, lore)
+        game_context = GameContext(
+            epoch=epoch,
+            environment=environment,
+            plot=plot,
+        )
+        self.game_context = pre_processing.validate_game_context(game_context)
 
-    def generate_dialogue(self, name: str, intent: str, description: str) -> dict[str, Any]:
+    def generate_dialogue(
+        self,
+        name: str,
+        age: int,
+        personality: str,
+        context: str,
+        talkativeness: Talkativeness,
+        main_character_relation: str,
+        intent: QuestDialogue | KeyDialogue | None = None,
+    ) -> str:
+        
         """Generate NPC dialogue using the NPC and game context."""
-        npc_context: dict[str, Any] = self.pre_processor.validate_NPC_context(name, intent, description)
-        contract = self.contract_builder.build(self.game_context, npc_context)
-        llm_handler_result: dict[str, Any] = self.llm_handler.call(contract)
-        return llm_handler_result
+
+
+        if self.game_context:
+            
+            npc_context = NPCContext(
+                name=name,
+                age=age,
+                personality=personality,
+                context=context,
+                talkativeness=talkativeness,
+                main_character_relation=main_character_relation,
+                intent=intent,
+            )
+            validated_npc_context = pre_processing.validate_npc_context(npc_context)
+            contract = self.contract_builder.build(self.game_context, validated_npc_context)
+
+
+            dialogue: str = self.dialogue_generator.generate(contract)
+
+            return dialogue
