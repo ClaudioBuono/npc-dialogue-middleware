@@ -1,5 +1,5 @@
 from typing import Optional
-from core.types.contexts import GameContext, KeyDialogue, NPCContext, QuestDialogue
+from core.types.contexts import GameContext, Dialogue, NPCContext, Quest
 from tools.errors import PreProcessingError, ValidationErrorCode
 
 # Semantic constraints for Game Context (TODO: Move inside CONFIG).
@@ -26,7 +26,8 @@ MAX_QUEST_OBJECTIVE_LENGTH = 500
 MAX_QUEST_DESCRIPTION_LENGTH = 3000
 MAX_QUEST_LOCATION_LENGTH = 200
 MAX_QUEST_REWARD_LENGTH = 300
-MAX_KEY_DIALOGUE_LENGTH = 1000
+MAX_DIALOGUE_LENGTH = 1000
+MAX_MORE_INFO_LENGTH = 1000
 
 def validate_game_context(context: GameContext) -> GameContext:
     """Validate and normalize a GameContext instance.
@@ -165,16 +166,15 @@ def validate_npc_context(context: NPCContext) -> NPCContext:
             errors.append(f"Field 'language' must not contain more than {MAX_LANGUAGE_ENTRIES} entries.")
         language = normalized_languages
 
-    # --- Nested validation: intent (QuestDialogue | KeyDialogue | None) ---
+    # --- Nested validation: intent (Quest | Dialogue) ---
 
-    normalized_intent = None
-    if isinstance(context.intent, QuestDialogue):
-        normalized_intent, intent_errors = _validate_quest_dialogue(context.intent)
+    normalized_intent = context.intent
+    if isinstance(context.intent, Quest):
+        normalized_intent, intent_errors = _validate_quest(context.intent)
         errors.extend(intent_errors)
-    elif isinstance(context.intent, KeyDialogue):
-        normalized_intent, intent_errors = _validate_key_dialogue(context.intent)
+    elif isinstance(context.intent, Dialogue):
+        normalized_intent, intent_errors = _validate_dialogue(context.intent)
         errors.extend(intent_errors)
-    # context.intent is None -> normalized_intent stays None, no error.
 
     if errors:
         raise PreProcessingError(code=ValidationErrorCode.INVALID_VALUE, errors=errors)
@@ -195,22 +195,20 @@ def validate_npc_context(context: NPCContext) -> NPCContext:
 
 # --- PRIVATE METHODS ---
 
-def _validate_quest_dialogue(quest: QuestDialogue) -> tuple[QuestDialogue, list[str]]:
-    """Validate and normalize a QuestDialogue instance.
+def _validate_quest(quest: Quest) -> tuple[Quest, list[str]]:
+    """Validate and normalize a Quest instance.
 
     Args:
-        quest: The QuestDialogue instance to validate.
+        quest: The Quest instance to validate.
 
     Returns:
-        A tuple of (normalized QuestDialogue, list of error messages).
+        A tuple of (normalized Quest, list of error messages).
         The error list is empty if validation succeeded.
     """
     errors: list[str] = []
 
-    name = quest.name.strip()
-    if not name:
-        errors.append("Field 'intent.name' cannot be empty or whitespace only.")
-    elif len(name) > MAX_QUEST_NAME_LENGTH:
+    name = quest.name.strip() if quest.name else None
+    if name is not None and len(name) > MAX_QUEST_NAME_LENGTH:
         errors.append(f"Field 'intent.name' must not exceed {MAX_QUEST_NAME_LENGTH} characters.")
 
     objective = quest.objective.strip()
@@ -219,49 +217,52 @@ def _validate_quest_dialogue(quest: QuestDialogue) -> tuple[QuestDialogue, list[
     elif len(objective) > MAX_QUEST_OBJECTIVE_LENGTH:
         errors.append(f"Field 'intent.objective' must not exceed {MAX_QUEST_OBJECTIVE_LENGTH} characters.")
 
-    description = quest.description.strip()
-    if not description:
-        errors.append("Field 'intent.description' cannot be empty or whitespace only.")
-    elif len(description) > MAX_QUEST_DESCRIPTION_LENGTH:
+    description = quest.description.strip() if quest.description else None
+    if description is not None and len(description) > MAX_QUEST_DESCRIPTION_LENGTH:
         errors.append(f"Field 'intent.description' must not exceed {MAX_QUEST_DESCRIPTION_LENGTH} characters.")
 
-    location = quest.location.strip()
-    if not location:
-        errors.append("Field 'intent.location' cannot be empty or whitespace only.")
-    elif len(location) > MAX_QUEST_LOCATION_LENGTH:
+    location = quest.location.strip() if quest.location else None
+    if location is not None and len(location) > MAX_QUEST_LOCATION_LENGTH:
         errors.append(f"Field 'intent.location' must not exceed {MAX_QUEST_LOCATION_LENGTH} characters.")
 
     reward = quest.reward.strip() if quest.reward else None
     if reward is not None and len(reward) > MAX_QUEST_REWARD_LENGTH:
         errors.append(f"Field 'intent.reward' must not exceed {MAX_QUEST_REWARD_LENGTH} characters.")
 
-    normalized = QuestDialogue(
+    generate_accept_refuse = quest.generate_accept_refuse if quest.generate_accept_refuse else None
+    generate_more_opt = quest.generate_more_opt if quest.generate_more_opt else None
+
+    normalized = Quest(
         name=name,
         objective=objective,
         description=description,
         location=location,
         reward=reward,
+        generate_accept_refuse=generate_accept_refuse,
+        generate_more_opt=generate_more_opt
     )
     return normalized, errors
 
 
-def _validate_key_dialogue(key_dialogue: KeyDialogue) -> tuple[KeyDialogue, list[str]]:
-    """Validate and normalize a KeyDialogue instance.
+def _validate_dialogue(dialogue: Dialogue) -> tuple[Dialogue, list[str]]:
+    """Validate and normalize a Dialogue instance.
 
     Args:
-        key_dialogue: The KeyDialogue instance to validate.
+        dialogue: The KeyDialDialogueogue instance to validate.
 
     Returns:
-        A tuple of (normalized KeyDialogue, list of error messages).
+        A tuple of (normalized Dialogue, list of error messages).
         The error list is empty if validation succeeded.
     """
     errors: list[str] = []
 
-    must_use = key_dialogue.must_use.strip()
-    if not must_use:
-        errors.append("Field 'intent.must_use' cannot be empty or whitespace only.")
-    elif len(must_use) > MAX_KEY_DIALOGUE_LENGTH:
-        errors.append(f"Field 'intent.must_use' must not exceed {MAX_KEY_DIALOGUE_LENGTH} characters.")
+    must_use = dialogue.must_use.strip() if dialogue.must_use else None
+    if must_use is not None and len(must_use) > MAX_DIALOGUE_LENGTH:
+        errors.append(f"Field 'intent.must_use' must not exceed {MAX_DIALOGUE_LENGTH} characters.")
 
-    normalized = KeyDialogue(must_use=must_use)
+    more_info = dialogue.more_info.strip() if dialogue.more_info else None
+    if more_info is not None and len(more_info) > MAX_MORE_INFO_LENGTH:
+        errors.append(f"Field 'intent.more_info' must not exceed {MAX_MORE_INFO_LENGTH} characters.")
+
+    normalized = Dialogue(must_use=must_use, more_info=more_info)
     return normalized, errors
