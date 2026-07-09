@@ -6,7 +6,7 @@ from tools.errors import PreProcessingError, ValidationErrorCode
 MIN_EPOCH_LENGTH = 2
 MAX_EPOCH_LENGTH = 100
 MAX_ENVIRONMENT_LENGTH = 2000
-MAX_PLOT_LENGTH = 5000
+MAX_WORLD_STATE_LENGTH = 3000
 MAX_MAIN_CHARACTER_DESCRIPTION_LENGTH = 2000
 
 # Semantic constraints for NPC Context — (TODO: Move inside CONFIG).
@@ -26,8 +26,9 @@ MAX_QUEST_OBJECTIVE_LENGTH = 500
 MAX_QUEST_DESCRIPTION_LENGTH = 3000
 MAX_QUEST_LOCATION_LENGTH = 200
 MAX_QUEST_REWARD_LENGTH = 300
-MAX_DIALOGUE_LENGTH = 1000
+MAX_MUST_USE_EXPRESSION_LENGTH = 1000
 MAX_MORE_INFO_LENGTH = 1000
+
 
 def validate_game_context(context: GameContext) -> GameContext:
     """Validate and normalize a GameContext instance.
@@ -62,9 +63,11 @@ def validate_game_context(context: GameContext) -> GameContext:
     elif len(environment) > MAX_ENVIRONMENT_LENGTH:
         errors.append(f"Field 'environment' must not exceed {MAX_ENVIRONMENT_LENGTH} characters.")
 
-    plot = context.plot.strip() if context.plot else None
-    if plot is not None and len(plot) > MAX_PLOT_LENGTH:
-        errors.append(f"Field 'plot' must not exceed {MAX_PLOT_LENGTH} characters.")
+    world_state = context.world_state.strip()
+    if not world_state:
+        errors.append("Field 'world_state' cannot be empty or whitespace only.")
+    elif len(world_state) > MAX_WORLD_STATE_LENGTH:
+        errors.append(f"Field 'world_state' must not exceed {MAX_WORLD_STATE_LENGTH} characters.")
 
     main_character_description = (
         context.main_character_description.strip()
@@ -86,17 +89,18 @@ def validate_game_context(context: GameContext) -> GameContext:
     return GameContext(
         epoch=epoch,
         environment=environment,
-        plot=plot,
+        world_state=world_state,
         main_character_description=main_character_description,
     )
+
 
 def validate_npc_context(context: NPCContext) -> NPCContext:
     """Validate and normalize an NPCContext instance.
 
     Performs semantic validation beyond what Pydantic already checks at
     the type level (e.g. length constraints, blank-string checks, age
-    bounds), including recursive validation of the nested `intent` field
-    when present. Returns a normalized copy of the context.
+    bounds), including recursive validation of the nested `intent` field.
+    Returns a normalized copy of the context.
 
     Args:
         context: The NPCContext instance to validate, already parsed and
@@ -104,7 +108,7 @@ def validate_npc_context(context: NPCContext) -> NPCContext:
 
     Returns:
         A new NPCContext instance with normalized (stripped) string fields
-        and a validated/normalized `intent`, if present.
+        and a validated/normalized `intent`.
 
     Raises:
         PreProcessingError: If any field fails semantic validation.
@@ -168,13 +172,11 @@ def validate_npc_context(context: NPCContext) -> NPCContext:
 
     # --- Nested validation: intent (Quest | Dialogue) ---
 
-    normalized_intent = context.intent
     if isinstance(context.intent, Quest):
         normalized_intent, intent_errors = _validate_quest(context.intent)
-        errors.extend(intent_errors)
-    elif isinstance(context.intent, Dialogue):
+    else:
         normalized_intent, intent_errors = _validate_dialogue(context.intent)
-        errors.extend(intent_errors)
+    errors.extend(intent_errors)
 
     if errors:
         raise PreProcessingError(code=ValidationErrorCode.INVALID_VALUE, errors=errors)
@@ -193,7 +195,34 @@ def validate_npc_context(context: NPCContext) -> NPCContext:
         language=language,
     )
 
+
 # --- PRIVATE METHODS ---
+
+def _validate_dialogue_base_fields(dialogue: Dialogue) -> tuple[Optional[str], Optional[str], list[str]]:
+    """Validate and normalize the fields shared by `Dialogue` and `Quest`.
+
+    Since `Quest` inherits from `Dialogue`, this helper is reused by both
+    `_validate_quest` and `_validate_dialogue` to avoid duplicating the
+    validation logic for `must_use_expression` and `more_info`.
+
+    Args:
+        dialogue: A Dialogue (or Quest, since it inherits from Dialogue) instance.
+
+    Returns:
+        A tuple of (normalized must_use_expression, normalized more_info, list of error messages).
+    """
+    errors: list[str] = []
+
+    must_use_expression = dialogue.must_use_expression.strip() if dialogue.must_use_expression else None
+    if must_use_expression is not None and len(must_use_expression) > MAX_MUST_USE_EXPRESSION_LENGTH:
+        errors.append(f"Field 'intent.must_use_expression' must not exceed {MAX_MUST_USE_EXPRESSION_LENGTH} characters.")
+
+    more_info = dialogue.more_info.strip() if dialogue.more_info else None
+    if more_info is not None and len(more_info) > MAX_MORE_INFO_LENGTH:
+        errors.append(f"Field 'intent.more_info' must not exceed {MAX_MORE_INFO_LENGTH} characters.")
+
+    return must_use_expression, more_info, errors
+
 
 def _validate_quest(quest: Quest) -> tuple[Quest, list[str]]:
     """Validate and normalize a Quest instance.
@@ -205,7 +234,7 @@ def _validate_quest(quest: Quest) -> tuple[Quest, list[str]]:
         A tuple of (normalized Quest, list of error messages).
         The error list is empty if validation succeeded.
     """
-    errors: list[str] = []
+    must_use_expression, more_info, errors = _validate_dialogue_base_fields(quest)
 
     name = quest.name.strip() if quest.name else None
     if name is not None and len(name) > MAX_QUEST_NAME_LENGTH:
@@ -229,17 +258,16 @@ def _validate_quest(quest: Quest) -> tuple[Quest, list[str]]:
     if reward is not None and len(reward) > MAX_QUEST_REWARD_LENGTH:
         errors.append(f"Field 'intent.reward' must not exceed {MAX_QUEST_REWARD_LENGTH} characters.")
 
-    generate_accept_refuse = quest.generate_accept_refuse if quest.generate_accept_refuse else None
-    generate_more_opt = quest.generate_more_opt if quest.generate_more_opt else None
-
     normalized = Quest(
-        name=name,
+        must_use_expression=must_use_expression,
+        more_info=more_info,
+        has_options=quest.has_options,
         objective=objective,
+        name=name,
         description=description,
         location=location,
         reward=reward,
-        generate_accept_refuse=generate_accept_refuse,
-        generate_more_opt=generate_more_opt
+        has_choice=quest.has_choice,
     )
     return normalized, errors
 
@@ -248,21 +276,17 @@ def _validate_dialogue(dialogue: Dialogue) -> tuple[Dialogue, list[str]]:
     """Validate and normalize a Dialogue instance.
 
     Args:
-        dialogue: The KeyDialDialogueogue instance to validate.
+        dialogue: The Dialogue instance to validate.
 
     Returns:
         A tuple of (normalized Dialogue, list of error messages).
         The error list is empty if validation succeeded.
     """
-    errors: list[str] = []
+    must_use_expression, more_info, errors = _validate_dialogue_base_fields(dialogue)
 
-    must_use = dialogue.must_use.strip() if dialogue.must_use else None
-    if must_use is not None and len(must_use) > MAX_DIALOGUE_LENGTH:
-        errors.append(f"Field 'intent.must_use' must not exceed {MAX_DIALOGUE_LENGTH} characters.")
-
-    more_info = dialogue.more_info.strip() if dialogue.more_info else None
-    if more_info is not None and len(more_info) > MAX_MORE_INFO_LENGTH:
-        errors.append(f"Field 'intent.more_info' must not exceed {MAX_MORE_INFO_LENGTH} characters.")
-
-    normalized = Dialogue(must_use=must_use, more_info=more_info)
+    normalized = Dialogue(
+        must_use_expression=must_use_expression,
+        more_info=more_info,
+        has_options=dialogue.has_options,
+    )
     return normalized, errors

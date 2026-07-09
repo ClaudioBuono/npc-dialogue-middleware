@@ -2,103 +2,106 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from enum import Enum
 
-
-class Quest(BaseModel):
-    """Quest block.
-
-    Contains the information needed to describe a quest that the NPC
-    can assign to the player.
-    """
-
-    objective: str = Field(..., description="Objective the player must accomplish.")
-    name: Optional[str] = Field(None, description="Name of the quest, if already defined.")
-    description: Optional[str] = Field(None, description="Narrative description of the quest, if already defined.")
-    location: Optional[str] = Field(None, description="Location where the quest takes place or must be completed, if already defined.")
-    reward: Optional[str] = Field(None, description="Reward given upon completion of the quest, if any.")
-    generate_accept_refuse: Optional[bool] = Field(
-        False,
-        description="Whether the dialogue options should include the possibility for the "
-                    "player to accept or refuse the quest."
-    )
-    generate_more_opt: Optional[bool] = Field(
-        False,
-        description="Whether additional dialogue options beyond accept/refuse should be "
-                    "generated for this quest (e.g. asking for more details, negotiating terms)."
-    )
-
-
 class Dialogue(BaseModel):
-    """Dialogue block, covering both key and simple dialogue cases.
-
-    Used for any NPC interaction that is not a quest. If `must_use` is
-    set, the NPC must necessarily convey that specific piece
-    of information during the conversation.
+    """
+    Base dialogue block describing any standard NPC interaction or conversation.
     """
 
-    must_use: Optional[str] = Field(None, description="Piece of information the NPC must necessarily communicate or use in the dialogue.")
+    must_use_expression: Optional[str] = Field(
+        None, 
+        description="Core piece of information or key message the NPC must communicate during the dialogue."
+    )
     more_info: Optional[str] = Field(
         None,
-        description="Additional information the dialogue options should be based on when "
-                    "generating them (e.g. context or details to inform the player's choices)."
+        description="Contextual details or background information to guide the generation and eventual player's dialogue choices."
+    )
+    has_options: Optional[bool] = Field(
+        False,
+        description="If True, additional dialogue options should be generated (e.g. asking for details)."
+    )
+
+class Quest(Dialogue):
+    """
+    Quest block.
+
+    Extends `Dialogue` with the information needed to describe a quest that the NPC can assign to the player.
+    """
+
+    objective: str = Field(..., description="The main task or goal the player must accomplish to complete the quest.")
+    name: Optional[str] = Field(None, description="The title of the quest, if predetermined.")
+    description: Optional[str] = Field(None, description="Narrative introduction and lore summary of the quest.")
+    location: Optional[str] = Field(None, description="The specific zone, world location, or target area where the quest takes place.")
+    reward: Optional[str] = Field(None, description="The loot, experience, currency, or favor awarded to the player upon completion.")
+    has_choice: Optional[bool] = Field(
+        False,
+        description="If True, the player can actively choose whether to accept or decline the quest."
     )
 
 
 class Talkativeness(Enum):
-    """How talkative the NPC is, used to calibrate the length and frequency of its lines."""
+    """
+    The verbosity level of the NPC, controlling the length and frequency of their dialogue lines.
+    """
 
-    VERYLOW = 1
+    VERY_LOW = 1
     LOW = 2
     AVERAGE = 3
     HIGH = 4
-    VERYHIGH = 5
+    VERY_HIGH = 5
 
 
 class GameContext(BaseModel):
-    """Overall context of the game.
-
-    Defines the setting and background information shared
-    by all characters in the game world.
+    """
+    Global game context defining the shared world setting, lore, and background.
     """
 
-    # Required
-    epoch: str = Field(..., description="Epoch in which the story takes place (e.g. medieval/futuristic/cyberpunk).")
-    environment: str = Field(..., description="Description of the environment in which the story takes place.")
-
-    # Optional
-    plot: Optional[str] = Field(None, description="Relevant plot known to everyone in the game world.")
+    epoch: str = Field(
+        ..., 
+        description="The historical or thematic era of the story (e.g., Medieval, Hard Sci-Fi, Cyberpunk, High Fantasy)."
+    )
+    environment: str = Field(
+        ..., 
+        description="General description of the world's nature, atmosphere, climate, or architectural theme."
+    )
+    world_state: str = Field(
+        ..., 
+        description="The current global situation or major ongoing events in the world that everyone is aware of."
+    )
     main_character_description: Optional[str] = Field(
         None,
-        description="Description of the main character. Should be purely physical; "
-                    "can include personality traits only if the character is already famous in the game world."
+        description="Physical appearance of the protagonist. Include personality traits only if they are widely famous in the game world."
     )
 
 
 class NPCContext(BaseModel):
-    """Full description of an NPC (Non-Player Character).
-
-    Contains both biographical/personality information and the current
-    narrative state of the NPC, including its dialogue intent.
+    """
+    Comprehensive profile of an NPC, combining biographical lore, personality, and current narrative state.
     """
 
-    # Required
-    name: str = Field(..., description="Name of the character. May also include a surname or any other identifier suitable for the game world.")
-    age: int = Field(..., description="Age of the character, expressed in whatever format is suitable for the game world.")
-    personality: str = Field(..., description="Personality of the NPC.")
-    context: str = Field(..., description="Current context of the NPC: location, time of day, weather, and other useful details.")
+    name: str = Field(..., description="The full name, title, or alias of the NPC suitable for the game setting.")
+    age: int = Field(..., description="The age of the character.")
+    personality: str = Field(..., description="Psychological profile and behavioral traits of the NPC.")
+    context: str = Field(..., description="The immediate state of the NPC: their current location, time of day, weather, and current activity.")
     intent: Quest | Dialogue = Field(
         ...,
-        description="Dialogue intent of the NPC. Use a Quest when the NPC is assigning or "
-                    "discussing a mission. Use a Dialogue for anything else, including plain "
-                    "conversation with no particular narrative purpose."
+        description="The current driving purpose of the conversation."
     )
-    talkativeness: Talkativeness = Field(..., description="How much the NPC tends to talk.")
-    main_character_relation: str = Field(..., description="Relationship of the NPC with the main character.")
+    talkativeness: Talkativeness = Field(..., description="How much the NPC tends to talk.") 
+    main_character_relation: str = Field(..., description="The NPC's current attitude, stance, and relationship status toward the protagonist.")
 
-    # Optional
-    recent_plot: Optional[str] = Field(None, description="Recent events in the game world relevant to the NPC.")
-    visual_description: Optional[str] = Field(None, description="Physical description of the NPC.")
-    backstory: Optional[str] = Field(None, description="Backstory of the NPC.")
+    recent_plot: Optional[str] = Field(
+        None, 
+        description="Recent world events or narrative shifts that directly affect or interest this specific NPC."
+    )
+    visual_description: Optional[str] = Field(
+        None, 
+        description="Detailed physical appearance, clothing, equipment, and visible expressions of the NPC."
+    )
+    backstory: Optional[str] = Field(
+        None, 
+        description="The history, past experiences, and core motivations of the NPC."
+    )
     language: Optional[List[str]] = Field(
         None,
-        description="Languages spoken by the NPC. Defaults to the configuration's default language if not specified." # TODO: Set default language in game context from CONFIG
+        description="List of languages the NPC can speak. If null, falls back to the system's default language configuration." # TODO: Set default language in game context from CONFIG
     )
