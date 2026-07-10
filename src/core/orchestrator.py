@@ -1,12 +1,10 @@
-import logging
 from typing import Any
 from core.contract_builder import ContractBuilder
 from core.dialogue_generator import DialogueGenerator
 from core.llm.openai_client import OpenAICompatibleClient
-from core.types.contexts import GameContext, KeyDialogue, NPCContext, QuestDialogue, Talkativeness
+from core.types.contexts import Dialogue, GameContext, NPCContext, Quest, Talkativeness
 from tools import pre_processing
-
-logger = logging.getLogger(__name__)
+import dataclasses, json
 
 
 class Orchestrator:
@@ -61,12 +59,12 @@ class Orchestrator:
 
     # Orchestrator Methods ----------------------------------------------------------------------------
 
-    def set_game_context(self, environment: str, epoch: str, plot: str) -> None:
+    def set_game_context(self, environment: str, epoch: str, world_state: str) -> None:
         """Set the game context by validating environment, epoch, and lore."""
         game_context = GameContext(
             epoch=epoch,
             environment=environment,
-            plot=plot,
+            world_state=world_state,
         )
         self.game_context = pre_processing.validate_game_context(game_context)
 
@@ -78,7 +76,7 @@ class Orchestrator:
         context: str,
         talkativeness: Talkativeness,
         main_character_relation: str,
-        intent: QuestDialogue | KeyDialogue | None = None,
+        intent: Quest | Dialogue
     ) -> str:
         
         """Generate NPC dialogue using the NPC and game context."""
@@ -97,6 +95,8 @@ class Orchestrator:
             )
             validated_npc_context = pre_processing.validate_npc_context(npc_context)
             contract = self.contract_builder.build(self.game_context, validated_npc_context)
+            
+            print(json.dumps(dataclasses.asdict(contract), indent=2))
 
 
             dialogue: str = self.dialogue_generator.generate(contract)
