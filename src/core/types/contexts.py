@@ -43,11 +43,11 @@ class Talkativeness(Enum):
     The verbosity level of the NPC, controlling the length and frequency of their dialogue lines.
     """
 
-    VERY_LOW = 1
-    LOW = 2
-    AVERAGE = 3
-    HIGH = 4
-    VERY_HIGH = 5
+    VERY_LOW = "Very terse"
+    LOW = "Reserved"
+    AVERAGE = "Balanced"
+    HIGH = "Talkative"
+    VERY_HIGH = "Very talkative"
 
 
 class GameContext(BaseModel):

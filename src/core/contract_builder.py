@@ -93,7 +93,7 @@ class ContractBuilder:
             f"Age: {npc_context.age}",
             f"Personality: {npc_context.personality}",
             f"Context: {npc_context.context}",
-            f"Talkativeness: {npc_context.talkativeness}",
+            f"Talkativeness: {npc_context.talkativeness.value}",
             f"Main Character Relation: {npc_context.main_character_relation}",
         ]
         if npc_context.recent_plot:

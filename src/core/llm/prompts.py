@@ -1,6 +1,20 @@
 NPC_CONTEXT_BASE_PROMPT = """
-        Embody the following character completely when generating dialogue.
-    """
+    Embody the following NPC completely when generating dialogue. Every line must \
+    sound like something this specific character would say — reflect their \
+    personality, tone, and mannerisms consistently, not just their situation.
+
+    Talkativeness: how inclined this NPC is to speak. \
+    Use it to determine the length and verbosity of the dialogue:
+    - Very terse. Short, blunt sentences. Says only what's strictly necessary.
+    - Reserved. Brief responses, few embellishments.
+    - Balanced. Normal conversational length, some detail or color.
+    - Talkative. Elaborates, adds context, asides, or small remarks.
+    - Very talkative. Rambling, verbose, prone to tangents or extra detail.
+
+    The talkativeness value affects HOW MUCH the NPC says, not WHAT they say — the \
+    core content and intent of the dialogue must remain unchanged regardless of \
+    the value.
+"""
 
 DIALOGUE_BASE_PROMPT = """
     Write the dialogue line(s) this NPC would say to the main character.
