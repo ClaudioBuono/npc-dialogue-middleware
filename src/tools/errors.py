@@ -19,6 +19,10 @@ class LLMClientErrorCode(Enum):
     EMPTY_RESPONSE = "empty_response"
     UNKNOWN_ERROR = "unknown_error"
 
+class RoutingConfigErrorCode(Enum):
+    """Semantic error codes for invalid model routing configuration."""
+
+    MISSING_INTENDED_TIER = "missing_intended_tier"
 
 # Error parsing ----------------------------------------------------------
 class PreProcessingError(Exception):
@@ -46,3 +50,13 @@ class LLMClientError(Exception):
         self.code = code
         self.message = message
         super().__init__(f"[{code.value}] {message}")
+
+class RoutingConfigError(Exception):
+    """Raised when the provided model configuration is inconsistent with
+    the requested profiling strategy (e.g. self-assessment requested but
+    a model is missing its declared tier)."""
+
+    def __init__(self, code: RoutingConfigErrorCode, errors: list[str]):
+        self.code = code
+        self.errors = errors
+        super().__init__(f"[{code.value}] " + "; ".join(errors))
