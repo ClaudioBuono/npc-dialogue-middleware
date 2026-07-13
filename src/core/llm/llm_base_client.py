@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Iterator
 from core.types.contract import Contract
 
 
@@ -18,6 +19,28 @@ class BaseLLMClient(ABC):
 
         Returns:
             JSON string or raw text returned by the model.
+        """
+        ...
+
+    @abstractmethod
+    def generate_streaming(self, contract: Contract, temperature: float) -> Iterator[str]:
+        """Performs a streaming call to the model, yielding text chunks
+        as they arrive.
+
+        Used primarily for profiling (time to first token, throughput),
+        where measuring incremental arrival matters. Regular dialogue
+        generation should keep using `generate()`.
+
+        Args:
+            contract:    Structured payload describing the request.
+            temperature: Temperature value for generation (0.0-1.0).
+
+        Yields:
+            Text chunks as they are produced by the model.
+
+        Raises:
+            LLMClientError: If the call fails (connection, auth, rate
+                limit, timeout).
         """
         ...
 

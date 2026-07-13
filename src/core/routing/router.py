@@ -1,6 +1,3 @@
-"""Routes an incoming request to the most appropriate registered model,
-based on its estimated complexity."""
-
 from core.routing.registry import ModelRegistry, IntendedTier
 from core.routing.profiler import RankedModel
 from core.llm.llm_base_client import BaseLLMClient

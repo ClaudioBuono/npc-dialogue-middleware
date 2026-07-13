@@ -2,9 +2,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from types import ModuleType
 from typing import get_args, get_origin, Union
-
 from pydantic import BaseModel
-
+from core.config.thresholds import CHARS_PER_TOKEN
 from core.types.contexts import GameContext, NPCContext, Quest, Dialogue
 
 
@@ -135,7 +134,7 @@ class ComplexityAnalyzer:
         thresholds: ModuleType,
         realistic_max_ratio: float = 0.15,
         min_tokens: float = 0.0,
-        chars_per_token: float = 4.0,
+        chars_per_token: float = CHARS_PER_TOKEN,
         flag_field_weight: float = 2.0,
     ) -> "ComplexityAnalyzer":
         """

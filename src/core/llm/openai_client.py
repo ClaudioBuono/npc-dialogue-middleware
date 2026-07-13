@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from openai import (
     OpenAI,
     APIConnectionError,
@@ -78,6 +80,31 @@ class OpenAICompatibleClient(BaseLLMClient):
             )
 
         return content
+
+    def generate_streaming(self, contract: Contract, temperature: float) -> Iterator[str]:
+            """
+            Streams text chunks as they arrive, used for profiling (time
+            to first token, throughput). See BaseLLMClient for full contract.
+            """
+            request_kwargs = self._format_request(contract, temperature)
+            request_kwargs["stream"] = True
+
+            try:
+                stream = self._client.chat.completions.create(**request_kwargs, timeout=3.0)
+                for chunk in stream:
+                    delta = chunk.choices[0].delta.content
+                    if delta:
+                        yield delta
+            except AuthenticationError as e:
+                raise LLMClientError(code=LLMClientErrorCode.AUTHENTICATION_ERROR, message=f"Authentication failed for model '{self._model_identifier}': {e}") from e
+            except RateLimitError as e:
+                raise LLMClientError(code=LLMClientErrorCode.RATE_LIMIT_ERROR, message=f"Rate limit exceeded for model '{self._model_identifier}': {e}") from e
+            except APITimeoutError as e:
+                raise LLMClientError(code=LLMClientErrorCode.TIMEOUT_ERROR, message=f"Request timed out for model '{self._model_identifier}': {e}") from e
+            except APIConnectionError as e:
+                raise LLMClientError(code=LLMClientErrorCode.CONNECTION_ERROR, message=f"Could not connect to endpoint for model '{self._model_identifier}': {e}") from e
+            except APIStatusError as e:
+                raise LLMClientError(code=LLMClientErrorCode.UNKNOWN_ERROR, message=f"Provider returned an error (status {e.status_code}) for model '{self._model_identifier}': {e}") from e
 
     @property
     def model_name(self) -> str:

@@ -38,6 +38,25 @@ class ModelRegistry:
         ranked = strategy.profile(models)
         cls._ranked_models = sorted(ranked, key=lambda r: r.score, reverse=True)
 
+    @classmethod
+    def get_ranked_models(cls) -> List[RankedModel]:
+        return cls._ranked_models
+
+    @classmethod
+    def get_best_for_tier(cls, min_tier: IntendedTier) -> Optional[RankedModel]:
+        """Returns the highest-scoring model whose declared tier is at
+        least `min_tier`. Models with no declared tier are treated as
+        LOW for this comparison."""
+        tier_order = {IntendedTier.LOW: 0, IntendedTier.MEDIUM: 1, IntendedTier.HIGH: 2}
+        candidates = [
+            r for r in cls._ranked_models
+            if tier_order[r.config.intended_tier or IntendedTier.LOW] >= tier_order[min_tier]
+        ]
+        if candidates:
+            return candidates[0]
+
+        return cls._ranked_models[0] if cls._ranked_models else None
+
     @staticmethod
     def _validate_tiers_declared(models: List[ModelConfig]) -> None:
         """
@@ -62,22 +81,4 @@ class ModelRegistry:
         """
         score = _TIER_TO_SCORE[model.intended_tier] if model.intended_tier is not None else _TIER_TO_SCORE[IntendedTier.MEDIUM]
         return RankedModel(config=model, score=score, client=_build_client(model))
-
-    @classmethod
-    def get_ranked_models(cls) -> List[RankedModel]:
-        return cls._ranked_models
-
-    @classmethod
-    def get_best_for_tier(cls, min_tier: IntendedTier) -> Optional[RankedModel]:
-        """Returns the highest-scoring model whose declared tier is at
-        least `min_tier`. Models with no declared tier are treated as
-        LOW for this comparison."""
-        tier_order = {IntendedTier.LOW: 0, IntendedTier.MEDIUM: 1, IntendedTier.HIGH: 2}
-        candidates = [
-            r for r in cls._ranked_models
-            if tier_order[r.config.intended_tier or IntendedTier.LOW] >= tier_order[min_tier]
-        ]
-        if candidates:
-            return candidates[0]
-
-        return cls._ranked_models[0] if cls._ranked_models else None
+    
