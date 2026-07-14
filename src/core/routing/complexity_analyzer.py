@@ -3,6 +3,7 @@ from types import ModuleType
 from typing import get_args, get_origin, Union
 from pydantic import BaseModel
 from core.config.thresholds import CHARS_PER_TOKEN, HIGH_THRESHOLD, LOW_THRESHOLD
+from core.routing.helpers import classify_score_to_complexity_tier
 from core.types.contexts import GameContext, NPCContext, Quest, Dialogue
 from core.types.enums import ComplexityTier
 
@@ -190,7 +191,7 @@ class ComplexityAnalyzer:
         total = sum(breakdown[key] * self._WEIGHTS[key] for key in breakdown)
 
         # Classifies the value to a tier label
-        tier = self._classify(total)
+        tier = classify_score_to_complexity_tier(total)
 
         return ComplexityScore(value=round(total, 3), tier=tier, breakdown=breakdown)
 
@@ -314,13 +315,6 @@ class ComplexityAnalyzer:
         """
         important_relations = {"hostile", "romantic interest", "nemesis"} #TODO: obtain this list from input or saved words
         return 1.0 if npc_context.main_character_relation.lower() in important_relations else 0.0
-
-    def _classify(self, score: float) -> ComplexityTier:
-        if score < LOW_THRESHOLD:
-            return ComplexityTier.LOW
-        if score < HIGH_THRESHOLD:
-            return ComplexityTier.MEDIUM
-        return ComplexityTier.HIGH
     
     # ------------------------------------------------------------------
     # DEBUG

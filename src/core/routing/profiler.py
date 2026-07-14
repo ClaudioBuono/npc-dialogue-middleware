@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 from core.config.thresholds import CHARS_PER_TOKEN
+from core.routing.helpers import classify_score_to_complexity_tier
 from core.routing.models import ModelConfig
 from core.llm.llm_base_client import BaseLLMClient
 from core.llm.openai_client import OpenAICompatibleClient
@@ -12,9 +13,9 @@ from tools.errors import LLMClientError, LLMClientErrorCode
 
 # Placeholder score mapping used by self-assessment and as a fallback.
 _TIER_TO_SCORE = {
-    ComplexityTier.LOW: 30.0,
-    ComplexityTier.MEDIUM: 60.0,
-    ComplexityTier.HIGH: 90.0,
+    ComplexityTier.LOW: 0.3,
+    ComplexityTier.MEDIUM: 0.6,
+    ComplexityTier.HIGH: 0.9,
 }
 _DEFAULT_FALLBACK_SCORE = _TIER_TO_SCORE[ComplexityTier.MEDIUM]
 
@@ -80,6 +81,7 @@ class BenchmarkProfiler(BaseProfiler):
         for model in models:
             client = build_client(model)
             score = self._compute_score(client, model)
+            model.intended_tier = classify_score_to_complexity_tier(score)
             ranked.append(RankedModel(config=model, score=score, client=client))
         return ranked
 
@@ -164,13 +166,13 @@ class BenchmarkProfiler(BaseProfiler):
 
     @staticmethod
     def _normalize_lower_is_better(value: float, scale: float) -> float:
-        """Maps a 'lower is better' raw measurement to a 0-100 score."""
-        return max(0.0, min(100.0, 100.0 * scale / (scale + value)))
+        """Maps a 'lower is better' raw measurement to a 0-1 score."""
+        return max(0.0, min(1.0, 1.0 * scale / (scale + value)))
 
     @staticmethod
     def _normalize_higher_is_better(value: float, reference: float) -> float:
-        """Maps a 'higher is better' raw measurement to a 0-100 score."""
-        return max(0.0, min(100.0, 100.0 * value / reference))
+        """Maps a 'higher is better' raw measurement to a 0-1 score."""
+        return max(0.0, min(1.0, 1.0 * value / reference))
 
 
 def build_client(model: ModelConfig) -> BaseLLMClient:

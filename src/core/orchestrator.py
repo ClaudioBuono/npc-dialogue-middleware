@@ -2,10 +2,12 @@ from typing import Any
 from core.contract_builder import ContractBuilder
 from core.dialogue_generator import DialogueGenerator
 from core.llm.openai_client import OpenAICompatibleClient
+from core.routing.models import load_config_from_file
+from core.routing.registry import ModelRegistry
+from core.routing.router import LLMRouter
 from core.types.contexts import Dialogue, GameContext, NPCContext, Quest, Talkativeness
 from tools import pre_processing
-import dataclasses, json
-
+from test_routing import set_mock_models
 
 class Orchestrator:
     """
@@ -31,14 +33,9 @@ class Orchestrator:
     def __init__(self) -> None:
         if self._initialized:
             return
-        self.contract_builder = ContractBuilder()
-        self.dialogue_generator = DialogueGenerator(
-            client=OpenAICompatibleClient(
-                endpoint="http://localhost:11434/v1",
-                api_key=None,
-                model_identifier="llama3.2",
-            )
-        )
+        self.contract_builder: ContractBuilder = ContractBuilder()
+        self.llm_router: LLMRouter = LLMRouter()
+        self.dialogue_generator: DialogueGenerator = DialogueGenerator()
         self._initialized = True
 
     @classmethod
@@ -95,10 +92,14 @@ class Orchestrator:
             )
             validated_npc_context = pre_processing.validate_npc_context(npc_context)
             contract = self.contract_builder.build(self.game_context, validated_npc_context)
-            
-            print(json.dumps(dataclasses.asdict(contract), indent=2))
 
+            #configs = load_config_from_file("src\modelconfigs_test.json")
 
+            #ModelRegistry().set_models(configs,profiler=True)
+
+            client: OpenAICompatibleClient = self.llm_router.select_model(game_context = self.game_context, npc_context = validated_npc_context)
+
+            self.dialogue_generator.set_client(client)
             dialogue: str = self.dialogue_generator.generate(contract)
 
             return dialogue

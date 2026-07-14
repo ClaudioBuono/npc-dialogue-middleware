@@ -1,9 +1,11 @@
 from typing import List
+from core.config import thresholds
 from core.config.thresholds import HIGH_THRESHOLD, LOW_THRESHOLD
-from core.routing.complexity_analyzer import ComplexityScore
+from core.routing.complexity_analyzer import ComplexityAnalyzer, ComplexityScore
 from core.routing.registry import ModelRegistry
 from core.routing.profiler import RankedModel
 from core.llm.llm_base_client import BaseLLMClient
+from core.types.contexts import GameContext, NPCContext
 from core.types.enums import ComplexityTier
 from tools.errors import LLMClientError, LLMClientErrorCode
 
@@ -14,7 +16,10 @@ class LLMRouter:
     based on the request's complexity tier.
     """
 
-    def select_model(self, complexity: ComplexityScore) -> BaseLLMClient:
+    def __init__(self):
+        self.complexity_analyzer = ComplexityAnalyzer.from_thresholds(thresholds)
+    
+    def select_model(self, game_context: GameContext, npc_context: NPCContext) -> BaseLLMClient:
         """
         Picks the best available model client for the given complexity.
         """
@@ -31,6 +36,9 @@ class LLMRouter:
             selected_model = ranked_models[0]
         
         else: # More than one model -> handle complexity based on tier
+            
+            complexity = self.complexity_analyzer.analyze(game_context, npc_context)
+
             match complexity.tier:
                 case ComplexityTier.LOW: selected_model = self._handle_low_complexity()  
                 case ComplexityTier.MEDIUM: selected_model = self._handle_medium_complexity(complexity.value) 

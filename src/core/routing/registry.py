@@ -49,6 +49,51 @@ class ModelRegistry:
         strategy: BaseProfiler = BenchmarkProfiler() if profiler else SelfAssessmentProfiler()
         ranked = strategy.profile(models)
         self._ranked_models = sorted(ranked, key=lambda r: r.score, reverse=True)
+        self._print_ranked_models()
+
+    def _print_ranked_models(self) -> None:
+        """Prints the currently ranked models as a formatted table.
+
+        Displays rank, id, computed score, declared/effective tier, endpoint,
+        and max context tokens for each registered model.
+        """
+        if not self._ranked_models:
+            print("No models registered.")
+            return
+
+        headers = ["#", "ID", "Score", "Tier", "Endpoint", "Max Ctx"]
+
+        rows = []
+        for i, ranked in enumerate(self._ranked_models, start=1):
+            cfg = ranked.config
+            tier = cfg.intended_tier.value if cfg.intended_tier else "-"
+            max_ctx = f"{cfg.max_context_tokens:,}" if cfg.max_context_tokens else "-"
+            rows.append([
+                str(i),
+                cfg.id,
+                f"{ranked.score:.3f}",
+                tier,
+                cfg.endpoint,
+                max_ctx,
+            ])
+
+        col_widths = [
+            max(len(headers[c]), max((len(row[c]) for row in rows), default=0))
+            for c in range(len(headers))
+        ]
+
+        def format_row(values: List[str]) -> str:
+            return "  ".join(v.ljust(col_widths[i]) for i, v in enumerate(values))
+
+        separator = "-" * (sum(col_widths) + 2 * (len(headers) - 1))
+
+        print(f"\nRanked models ({len(rows)} total):")
+        print(separator)
+        print(format_row(headers))
+        print(separator)
+        for row in rows:
+            print(format_row(row))
+        print(separator)
 
     def get_ranked_models(self) -> List[RankedModel]:
         return self._ranked_models
