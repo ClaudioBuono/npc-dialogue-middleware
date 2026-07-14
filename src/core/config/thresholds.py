@@ -25,5 +25,11 @@ MAX_QUEST_REWARD_LENGTH = 300
 MAX_MUST_USE_EXPRESSION_LENGTH = 1000
 MAX_MORE_INFO_LENGTH = 1000
 
-# Rough estimate of the number of characters per single token
 CHARS_PER_TOKEN = 4.0
+"""Rough estimate of the number of characters per single token"""
+
+LOW_THRESHOLD = 0.35
+"""Thresholds for classifing a task into LOW tier"""
+
+HIGH_THRESHOLD = 0.7
+"""Thresholds for classifing a task into HIGH tier"""

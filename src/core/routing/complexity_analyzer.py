@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
-from enum import Enum
 from types import ModuleType
 from typing import get_args, get_origin, Union
 from pydantic import BaseModel
-from core.config.thresholds import CHARS_PER_TOKEN
+from core.config.thresholds import CHARS_PER_TOKEN, HIGH_THRESHOLD, LOW_THRESHOLD
 from core.types.contexts import GameContext, NPCContext, Quest, Dialogue
+from core.types.enums import ComplexityTier
 
 
 # They are divided into two groups because the Intent is polymorphic (Dialogue or Quest): 
@@ -37,16 +37,6 @@ _QUEST_ONLY_LENGTH_THRESHOLD_NAMES = {
 }
 
 
-class ComplexityTier(str, Enum):
-    """Discrete routing tiers derived from the complexity score.
-       Should be used along side models tier classification for matching.
-    """
-
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-
-
 @dataclass
 class ComplexityScore:
     """Result of the complexity analysis, with a breakdown for debugging/logging."""
@@ -76,10 +66,6 @@ class ComplexityAnalyzer:
     }
 
     _DEFAULT_INTENT_COMPLEXITY = 0.5   # fallback for unmapped intents
-
-    # Thresholds for classification into discrete tiers
-    _LOW_THRESHOLD = 0.35
-    _HIGH_THRESHOLD = 0.7
 
     def __init__(
         self,
@@ -330,9 +316,9 @@ class ComplexityAnalyzer:
         return 1.0 if npc_context.main_character_relation.lower() in important_relations else 0.0
 
     def _classify(self, score: float) -> ComplexityTier:
-        if score < self._LOW_THRESHOLD:
+        if score < LOW_THRESHOLD:
             return ComplexityTier.LOW
-        if score < self._HIGH_THRESHOLD:
+        if score < HIGH_THRESHOLD:
             return ComplexityTier.MEDIUM
         return ComplexityTier.HIGH
     

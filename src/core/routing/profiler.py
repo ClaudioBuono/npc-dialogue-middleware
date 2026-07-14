@@ -3,19 +3,20 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 from core.config.thresholds import CHARS_PER_TOKEN
-from core.routing.models import ModelConfig, IntendedTier
+from core.routing.models import ModelConfig
 from core.llm.llm_base_client import BaseLLMClient
 from core.llm.openai_client import OpenAICompatibleClient
 from core.types.contract import Contract
+from core.types.enums import ComplexityTier
 from tools.errors import LLMClientError, LLMClientErrorCode
 
 # Placeholder score mapping used by self-assessment and as a fallback.
 _TIER_TO_SCORE = {
-    IntendedTier.LOW: 30.0,
-    IntendedTier.MEDIUM: 60.0,
-    IntendedTier.HIGH: 90.0,
+    ComplexityTier.LOW: 30.0,
+    ComplexityTier.MEDIUM: 60.0,
+    ComplexityTier.HIGH: 90.0,
 }
-_DEFAULT_FALLBACK_SCORE = _TIER_TO_SCORE[IntendedTier.MEDIUM]
+_DEFAULT_FALLBACK_SCORE = _TIER_TO_SCORE[ComplexityTier.MEDIUM]
 
 # Hard limit for profiling execution and its penalty fallback.
 _TIMEOUT_PENALTY_SCORE = 5.0  # Minimal score assigned when a model times out during profiling
@@ -60,7 +61,7 @@ class SelfAssessmentProfiler(BaseProfiler):
 
     def profile(self, models: List[ModelConfig]) -> List[RankedModel]:
         return [
-            RankedModel(config=model, score=_TIER_TO_SCORE[model.intended_tier], client=_build_client(model))
+            RankedModel(config=model, score=_TIER_TO_SCORE[model.intended_tier], client=build_client(model))
             for model in models
         ]
 
@@ -77,7 +78,7 @@ class BenchmarkProfiler(BaseProfiler):
         """Ranks the given models by using the profiling metrics of the class."""
         ranked: List[RankedModel] = []
         for model in models:
-            client = _build_client(model)
+            client = build_client(model)
             score = self._compute_score(client, model)
             ranked.append(RankedModel(config=model, score=score, client=client))
         return ranked
@@ -172,6 +173,6 @@ class BenchmarkProfiler(BaseProfiler):
         return max(0.0, min(100.0, 100.0 * value / reference))
 
 
-def _build_client(model: ModelConfig) -> BaseLLMClient:
+def build_client(model: ModelConfig) -> BaseLLMClient:
     """Builds the appropriate BaseLLMClient for a given model configuration."""
     return OpenAICompatibleClient(endpoint=model.endpoint, api_key=model.api_key, model_identifier=model.id)

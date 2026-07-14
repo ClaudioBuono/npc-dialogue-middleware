@@ -1,15 +1,6 @@
-from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, Field
-
-
-class IntendedTier(str, Enum):
-    """Developer-declared power tier for a model, used for self-assessment and 
-    as a fallback bucket when real profiling is unavailable."""
-
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
+from core.types.enums import ComplexityTier
 
 # TODO: define the input file structure
 class ModelConfig(BaseModel):
@@ -17,7 +8,7 @@ class ModelConfig(BaseModel):
 
     id: str = Field(..., description="Unique identifier for this model within the middleware.")
     endpoint: str = Field(..., description="Base URL of the model's OpenAI-compatible API endpoint.")
-    intended_tier: Optional[IntendedTier] = Field(
+    intended_tier: Optional[ComplexityTier] = Field(
         None,
         description="Developer-declared power tier. Used directly when profiler=False, "
                     "and as a fallback when automatic profiling is not yet available."
