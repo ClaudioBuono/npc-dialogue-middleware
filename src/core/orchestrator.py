@@ -1,11 +1,14 @@
-from typing import Any
+from typing import Any, Optional
 from core.contract_builder import ContractBuilder
 from core.dialogue_generator import DialogueGenerator
+from core.history import DialogueHistory
 from core.llm.openai_client import OpenAICompatibleClient
+from core.output_composer import DialogueOutputComposer
 from core.routing.models import load_config_from_file
 from core.routing.registry import ModelRegistry
 from core.routing.router import LLMRouter
 from core.types.contexts import Dialogue, GameContext, NPCContext, Quest, Talkativeness
+from core.types.dataclasses import ComposedDialogue
 from tools import pre_processing
 from test_routing import set_mock_models
 
@@ -36,6 +39,10 @@ class Orchestrator:
         self.contract_builder: ContractBuilder = ContractBuilder()
         self.llm_router: LLMRouter = LLMRouter()
         self.dialogue_generator: DialogueGenerator = DialogueGenerator()
+        self.dialogue_history: DialogueHistory = DialogueHistory()
+        self.dialogue_composer: DialogueOutputComposer = DialogueOutputComposer()
+
+        self._iterations = 0
         self._initialized = True
 
     @classmethod
@@ -73,13 +80,20 @@ class Orchestrator:
         context: str,
         talkativeness: Talkativeness,
         main_character_relation: str,
-        intent: Quest | Dialogue
-    ) -> str:
+        intent: Quest | Dialogue,
+        last_player_choice: Optional[str]
+    ) -> ComposedDialogue:
         
         """Generate NPC dialogue using the NPC and game context."""
 
 
         if self.game_context:
+
+            self._iterations += 1
+
+            if last_player_choice:
+                self.dialogue_history.add_player_dialogue_to_history(last_player_choice)
+
             
             npc_context = NPCContext(
                 name=name,
@@ -91,15 +105,21 @@ class Orchestrator:
                 intent=intent,
             )
             validated_npc_context = pre_processing.validate_npc_context(npc_context)
-            contract = self.contract_builder.build(self.game_context, validated_npc_context)
+            contract = self.contract_builder.build(self.game_context, validated_npc_context, self.dialogue_history.get_dialogue_history())
 
-            #configs = load_config_from_file("src\modelconfigs_test.json")
+            configs = load_config_from_file("src\modelconfigs_test.json")
 
-            #ModelRegistry().set_models(configs,profiler=True)
+            ModelRegistry().set_models(configs,profiler=False)
 
             client: OpenAICompatibleClient = self.llm_router.select_model(game_context = self.game_context, npc_context = validated_npc_context)
 
             self.dialogue_generator.set_client(client)
-            dialogue: str = self.dialogue_generator.generate(contract)
+            raw_dialogue: str = self.dialogue_generator.generate(contract)
 
-            return dialogue
+            composed_dialogue = self.dialogue_composer.compose_dialogue(validated_npc_context, raw_dialogue)
+            self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
+
+            print(self.dialogue_history.get_dialogue_history())
+
+
+            return composed_dialogue

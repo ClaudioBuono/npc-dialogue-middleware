@@ -7,7 +7,7 @@ from core.routing.helpers import classify_score_to_complexity_tier
 from core.routing.models import ModelConfig
 from core.llm.llm_base_client import BaseLLMClient
 from core.llm.openai_client import OpenAICompatibleClient
-from core.types.contract import Contract
+from core.types.dataclasses import Contract
 from core.types.enums import ComplexityTier
 from tools.errors import LLMClientError, LLMClientErrorCode
 

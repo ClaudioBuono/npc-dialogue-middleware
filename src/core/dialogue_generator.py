@@ -1,7 +1,5 @@
-from typing import Any
-
 from core.llm.openai_client import OpenAICompatibleClient
-from core.types.contract import Contract
+from core.types.dataclasses import Contract
 
 
 class DialogueGenerator:

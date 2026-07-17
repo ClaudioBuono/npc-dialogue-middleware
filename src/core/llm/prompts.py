@@ -48,6 +48,11 @@ MAIN_CHARACTER_PROMPT = (
     "- Character Description: {main_character_description}\n"
 )
 
+DIALOGUE_HISTORY_PROMPT = (
+    "These are the main events of the current conversation between you and the player:\n"
+    "{dialogue_history}\n"
+)
+
 GENERAL_RULES_PROMPT = (
     "General rules:\n"
     "- If the NPC requires to give a Quest to the main character, it must use the given quest."

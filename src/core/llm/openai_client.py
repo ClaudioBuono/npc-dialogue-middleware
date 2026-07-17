@@ -8,7 +8,7 @@ from openai import (
     APITimeoutError,
     APIStatusError,
 )
-from core.types.contract import Contract
+from core.types.dataclasses import Contract
 from core.llm.llm_base_client import BaseLLMClient
 from tools.errors import LLMClientError, LLMClientErrorCode
 

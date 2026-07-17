@@ -1,5 +1,5 @@
-from typing import Any
-from core.types.contract import Contract
+from typing import Any, Dict
+from core.types.dataclasses import Contract
 from core.types.contexts import *
 from core.llm.prompts import *
 from core.types.contexts import GameContext
@@ -11,7 +11,7 @@ class ContractBuilder:
     combining game_context and npc_context.
     """
 
-    def build(self, game_context: GameContext, npc_context: NPCContext) -> Contract:
+    def build(self, game_context: GameContext, npc_context: NPCContext, dialogue_history: List[Dict[str,str]]) -> Contract:
         """
         Orchestrates the construction of the generation Contract for the LLM.
 
@@ -31,7 +31,7 @@ class ContractBuilder:
         """
 
         # Builds System prompt
-        system_prompt = self._build_system_prompt(game_context)
+        system_prompt = self._build_system_prompt(game_context, dialogue_history)
 
         # Quest Intent
         if isinstance(npc_context.intent, Quest):
@@ -57,7 +57,7 @@ class ContractBuilder:
 
         raise ValueError(f"Unsupported intent type: {type(npc_context.intent)}")
 
-    def _build_system_prompt(self, game_context: GameContext) -> str:
+    def _build_system_prompt(self, game_context: GameContext, dialogue_history: List[Dict[str,str]]) -> str:
         """
         Builds the common part of the system prompt, shared across all dialogue intents.
         Establishes the model's role, the game world context, and general output rules.
@@ -71,11 +71,14 @@ class ContractBuilder:
             main_character_description=game_context.main_character_description,
         )
 
+        dialogue_history_prompt = DIALOGUE_HISTORY_PROMPT.format(dialogue_history = dialogue_history)
+        
         result = "\n".join(
             [
                 ROLE_PROMPT,
                 world_context,
                 main_character_context,
+                dialogue_history_prompt,
                 GENERAL_RULES_PROMPT,
             ]
         )

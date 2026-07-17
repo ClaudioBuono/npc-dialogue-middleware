@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Iterator
-from core.types.contract import Contract
+from core.types.dataclasses import Contract
 
 
 class BaseLLMClient(ABC):
