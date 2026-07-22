@@ -1,7 +1,10 @@
+import logging
 from typing import Optional
 from core.config.thresholds import *
 from core.types.contexts import GameContext, Dialogue, NPCContext, Quest
 from tools.errors import PreProcessingError, ValidationErrorCode
+
+logger = logging.getLogger(__name__)
 
 
 def validate_game_context(context: GameContext) -> GameContext:
@@ -58,8 +61,10 @@ def validate_game_context(context: GameContext) -> GameContext:
         )
 
     if errors:
+        logger.warning(f"GameContext validation failed with {len(errors)} errors: {errors}")
         raise PreProcessingError(code=ValidationErrorCode.INVALID_VALUE, errors=errors)
 
+    logger.debug("GameContext validated successfully.")
     return GameContext(
         epoch=epoch,
         environment=environment,
@@ -153,8 +158,10 @@ def validate_npc_context(context: NPCContext) -> NPCContext:
     errors.extend(intent_errors)
 
     if errors:
+        logger.warning(f"NPCContext validation failed with {len(errors)} errors: {errors}")
         raise PreProcessingError(code=ValidationErrorCode.INVALID_VALUE, errors=errors)
 
+    logger.debug("NPCContext validated successfully.")
     return NPCContext(
         name=name,
         age=context.age,

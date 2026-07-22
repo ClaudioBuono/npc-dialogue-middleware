@@ -1,4 +1,5 @@
 from typing import Any, Optional
+import logging
 from core.contract_builder import ContractBuilder
 from core.dialogue_generator import DialogueGenerator
 from core.history import DialogueHistory
@@ -7,10 +8,12 @@ from core.output_composer import DialogueOutputComposer
 from core.routing.models import load_config_from_file
 from core.routing.registry import ModelRegistry
 from core.routing.router import LLMRouter
+from core.logger import to_json_format
 from core.types.contexts import Dialogue, GameContext, NPCContext, Quest, Talkativeness
 from core.types.dataclasses import ComposedDialogue
 from tools import pre_processing
-from test_routing import set_mock_models
+
+logger = logging.getLogger(__name__)
 
 class Orchestrator:
     """
@@ -86,6 +89,7 @@ class Orchestrator:
         
         """Generate NPC dialogue using the NPC and game context."""
 
+        logger.info(f"Generating dialogue for NPC '{name}'")
 
         if self.game_context:
 
@@ -93,6 +97,7 @@ class Orchestrator:
 
             if last_player_choice:
                 self.dialogue_history.add_player_dialogue_to_history(last_player_choice)
+                logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
 
             
             npc_context = NPCContext(
@@ -107,11 +112,12 @@ class Orchestrator:
             validated_npc_context = pre_processing.validate_npc_context(npc_context)
             contract = self.contract_builder.build(self.game_context, validated_npc_context, self.dialogue_history.get_dialogue_history())
 
-            configs = load_config_from_file("src\modelconfigs_test.json")
+            configs = load_config_from_file("src/modelconfigs_test.json")
 
             ModelRegistry().set_models(configs,profiler=False)
 
             client: OpenAICompatibleClient = self.llm_router.select_model(game_context = self.game_context, npc_context = validated_npc_context)
+            logger.debug(f"Selected LLM client: {type(client).__name__}")
 
             self.dialogue_generator.set_client(client)
             raw_dialogue: str = self.dialogue_generator.generate(contract)
@@ -119,7 +125,7 @@ class Orchestrator:
             composed_dialogue = self.dialogue_composer.compose_dialogue(validated_npc_context, raw_dialogue)
             self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
 
-            print(self.dialogue_history.get_dialogue_history())
+            logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
 
 
             return composed_dialogue

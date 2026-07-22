@@ -1,3 +1,4 @@
+import logging
 from typing import List
 from core.config import thresholds
 from core.config.thresholds import HIGH_THRESHOLD, LOW_THRESHOLD
@@ -8,6 +9,7 @@ from core.llm.llm_base_client import BaseLLMClient
 from core.types.contexts import GameContext, NPCContext
 from core.types.enums import ComplexityTier
 from tools.errors import LLMClientError, LLMClientErrorCode
+logger = logging.getLogger(__name__)
 
 
 class LLMRouter:
@@ -38,6 +40,7 @@ class LLMRouter:
         else: # More than one model -> handle complexity based on tier
             
             complexity = self.complexity_analyzer.analyze(game_context, npc_context)
+            logger.debug(f"Computed complexity score: {complexity.value}, tier: {complexity.tier}")
 
             match complexity.tier:
                 case ComplexityTier.LOW: selected_model = self._handle_low_complexity()  
@@ -89,10 +92,10 @@ class LLMRouter:
                 return ModelRegistry().get_best_for_tier(ComplexityTier.LOW) 
             
             else: # Closer to LOW
-                selected_model = ModelRegistry().get_best_for_tier(ComplexityTier.HIGH)
+                selected_model = ModelRegistry().get_best_for_tier(ComplexityTier.LOW)
                 if selected_model:
                     return selected_model
-                return ModelRegistry().get_best_for_tier(ComplexityTier.LOW) 
+                return ModelRegistry().get_best_for_tier(ComplexityTier.HIGH) 
 
 
     @staticmethod

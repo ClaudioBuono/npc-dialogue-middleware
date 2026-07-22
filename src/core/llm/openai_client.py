@@ -1,4 +1,6 @@
+import logging
 from typing import Iterator
+from core.logger import to_json_format
 
 from openai import (
     OpenAI,
@@ -11,6 +13,7 @@ from openai import (
 from core.types.dataclasses import Contract
 from core.llm.llm_base_client import BaseLLMClient
 from tools.errors import LLMClientError, LLMClientErrorCode
+logger = logging.getLogger(__name__)
 
 
 class OpenAICompatibleClient(BaseLLMClient):
@@ -41,30 +44,36 @@ class OpenAICompatibleClient(BaseLLMClient):
                 timeout) or if the model returns an empty/non-text response.
         """
         request = self._format_request(contract, temperature)
+        logger.debug(f"Sending request to OpenAI client:\n{to_json_format(request)}")
 
         try:
             response = self._client.chat.completions.create(**request)
         except AuthenticationError as e:
+            logger.error(f"Authentication failed for model '{self._model_identifier}': {e}")
             raise LLMClientError(
                 code=LLMClientErrorCode.AUTHENTICATION_ERROR,
                 message=f"Authentication failed for model '{self._model_identifier}': {e}",
             ) from e
         except RateLimitError as e:
+            logger.error(f"Rate limit exceeded for model '{self._model_identifier}': {e}")
             raise LLMClientError(
                 code=LLMClientErrorCode.RATE_LIMIT_ERROR,
                 message=f"Rate limit exceeded for model '{self._model_identifier}': {e}",
             ) from e
         except APITimeoutError as e:
+            logger.error(f"Request timed out for model '{self._model_identifier}': {e}")
             raise LLMClientError(
                 code=LLMClientErrorCode.TIMEOUT_ERROR,
                 message=f"Request timed out for model '{self._model_identifier}': {e}",
             ) from e
         except APIConnectionError as e:
+            logger.error(f"Connection error for model '{self._model_identifier}': {e}")
             raise LLMClientError(
                 code=LLMClientErrorCode.CONNECTION_ERROR,
                 message=f"Could not connect to endpoint for model '{self._model_identifier}': {e}",
             ) from e
         except APIStatusError as e:
+            logger.error(f"API status error for model '{self._model_identifier}': {e}")
             raise LLMClientError(
                 code=LLMClientErrorCode.UNKNOWN_ERROR,
                 message=f"Provider returned an error (status {e.status_code}) for model '{self._model_identifier}': {e}",

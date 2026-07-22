@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass, field
 from types import ModuleType
 from typing import get_args, get_origin, Union
@@ -6,7 +7,9 @@ from core.config.thresholds import CHARS_PER_TOKEN, HIGH_THRESHOLD, LOW_THRESHOL
 from core.routing.helpers import classify_score_to_complexity_tier
 from core.types.contexts import GameContext, NPCContext, Quest, Dialogue
 from core.types.enums import ComplexityTier
+from core.logger import to_json_format
 
+logger = logging.getLogger(__name__)
 
 # They are divided into two groups because the Intent is polymorphic (Dialogue or Quest): 
 # Dialogue Intent
@@ -192,6 +195,8 @@ class ComplexityAnalyzer:
 
         # Classifies the value to a tier label
         tier = classify_score_to_complexity_tier(total)
+        
+        logger.debug(f"Complexity analysis breakdown:\n{to_json_format(breakdown)}\n-> Total: {total:.3f}, Tier: {tier}")
 
         return ComplexityScore(value=round(total, 3), tier=tier, breakdown=breakdown)
 

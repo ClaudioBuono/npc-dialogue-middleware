@@ -1,8 +1,10 @@
+import logging
 from typing import List, Optional
 from core.routing.models import ModelConfig
 from core.routing.profiler import BaseProfiler, SelfAssessmentProfiler, BenchmarkProfiler, RankedModel, build_client, _TIER_TO_SCORE
 from core.types.enums import ComplexityTier
 from tools.errors import RoutingConfigError, RoutingConfigErrorCode
+logger = logging.getLogger(__name__)
 
 
 class ModelRegistry:
@@ -58,7 +60,7 @@ class ModelRegistry:
         and max context tokens for each registered model.
         """
         if not self._ranked_models:
-            print("No models registered.")
+            logger.info("No models registered.")
             return
 
         headers = ["#", "ID", "Score", "Tier", "Endpoint", "Max Ctx"]
@@ -87,13 +89,16 @@ class ModelRegistry:
 
         separator = "-" * (sum(col_widths) + 2 * (len(headers) - 1))
 
-        print(f"\nRanked models ({len(rows)} total):")
-        print(separator)
-        print(format_row(headers))
-        print(separator)
+        output_lines = [
+            f"Ranked models ({len(rows)} total):",
+            separator,
+            format_row(headers),
+            separator
+        ]
         for row in rows:
-            print(format_row(row))
-        print(separator)
+            output_lines.append(format_row(row))
+        output_lines.append(separator)
+        logger.info("\n".join(output_lines))
 
     def get_ranked_models(self) -> List[RankedModel]:
         return self._ranked_models
