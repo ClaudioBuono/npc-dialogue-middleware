@@ -65,3 +65,10 @@ GENERAL_RULES_PROMPT = (
     "- Respond ONLY with a valid JSON object matching the schema provided by "
     "the user, with no additional text, explanation, or markdown formatting.\n"
 )
+
+FAIRNESS_BASE_RULES_PROMPT = (
+    "Avoid stereotypes related to the NPC's gender, ethnicity, nationality, or social background."
+    "Do not associate negative traits (criminality, ignorance, aggression) with specific groups in a gratuitous manner or without justification in the narrative context."
+)
+
+

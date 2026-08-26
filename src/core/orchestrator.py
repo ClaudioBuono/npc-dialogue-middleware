@@ -2,6 +2,7 @@ from typing import Any, Optional
 import logging
 from core.contract_builder import ContractBuilder
 from core.dialogue_generator import DialogueGenerator
+from core.guardrail import Guardrail
 from core.history import DialogueHistory
 from core.llm.openai_client import OpenAICompatibleClient
 from core.output_composer import DialogueOutputComposer
@@ -44,9 +45,12 @@ class Orchestrator:
         self.dialogue_generator: DialogueGenerator = DialogueGenerator()
         self.dialogue_history: DialogueHistory = DialogueHistory()
         self.dialogue_composer: DialogueOutputComposer = DialogueOutputComposer()
+        self.guardrail: Guardrail = Guardrail()
 
         self._iterations = 0
         self._initialized = True
+
+
 
     @classmethod
     def get_instance(cls) -> "Orchestrator":
@@ -123,6 +127,9 @@ class Orchestrator:
             raw_dialogue: str = self.dialogue_generator.generate(contract)
 
             composed_dialogue = self.dialogue_composer.compose_dialogue(validated_npc_context, raw_dialogue)
+
+            self.guardrail.validate(composed_dialogue)
+
             self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
 
             logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
