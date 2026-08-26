@@ -1,5 +1,7 @@
+import logging
 from core.llm.openai_client import OpenAICompatibleClient
 from core.types.dataclasses import Contract
+logger = logging.getLogger(__name__)
 
 
 class DialogueGenerator:
