@@ -67,8 +67,8 @@ GENERAL_RULES_PROMPT = (
 )
 
 FAIRNESS_BASE_RULES_PROMPT = (
-    "Avoid stereotypes related to the NPC's gender, ethnicity, nationality, or social background."
-    "Do not associate negative traits (criminality, ignorance, aggression) with specific groups in a gratuitous manner or without justification in the narrative context."
+    "- Avoid stereotypes related to the NPC's gender, ethnicity, nationality, or social background."
+    "- Do not associate negative traits (criminality, ignorance, aggression) with specific groups in a gratuitous manner or without justification in the narrative context."
 )
 
 

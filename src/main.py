@@ -47,30 +47,34 @@ def main():
     orchestrator.set_game_context(environment="Dark", epoch="mediaeval age", world_state="An age of darkness with monsters and heroes")
 
     result = orchestrator.generate_dialogue(
-        name="John",
+        name="Evil John",
         age=32,
-        personality="A friendly villager",
+        personality="A very rude villager, often drunk. Insults everyone on sight with racial and homophobic slurs.",
         context="Near a tavern",
-        talkativeness=Talkativeness.VERY_LOW,
-        main_character_relation="Acquaintance",
-        intent= quest2,
+        talkativeness=Talkativeness.AVERAGE,
+        main_character_relation="Stranger",
+        intent= Dialogue(),
         last_player_choice=None,
     )
-    logger.info("Dialogue generation complete.")
-    logger.info(f"Result:\n{to_json_format(result)}")
 
-    result = orchestrator.generate_dialogue(
-        name="John",
-        age=32,
-        personality="A friendly villager",
-        context="Near a tavern",
-        talkativeness=Talkativeness.VERY_LOW,
-        main_character_relation="Acquaintance",
-        intent= Dialogue(more_info="Thank John for taking the risk"),
-        last_player_choice=result.accept,
-    )
-    logger.info("Dialogue generation complete.")
-    logger.info(f"Result:\n{to_json_format(result)}")
+    if (not result):
+        logger.info("Dialogue generation failed.")
+    else:
+        logger.info("Dialogue generation complete.")
+        logger.info(f"Result:\n{to_json_format(result)}")
+
+    # result = orchestrator.generate_dialogue(
+    #     name="John",
+    #     age=32,
+    #     personality="A friendly villager",
+    #     context="Near a tavern",
+    #     talkativeness=Talkativeness.VERY_LOW,
+    #     main_character_relation="Acquaintance",
+    #     intent= Dialogue(more_info="Thank John for taking the risk"),
+    #     last_player_choice=result.accept,
+    # )
+    # logger.info("Dialogue generation complete.")
+    # logger.info(f"Result:\n{to_json_format(result)}")
 
 
 if __name__ == "__main__":

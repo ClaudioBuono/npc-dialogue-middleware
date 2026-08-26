@@ -89,7 +89,7 @@ class Orchestrator:
         main_character_relation: str,
         intent: Quest | Dialogue,
         last_player_choice: Optional[str]
-    ) -> ComposedDialogue:
+    ) -> ComposedDialogue | None:
         
         """Generate NPC dialogue using the NPC and game context."""
 
@@ -128,7 +128,10 @@ class Orchestrator:
 
             composed_dialogue = self.dialogue_composer.compose_dialogue(validated_npc_context, raw_dialogue)
 
-            self.guardrail.validate(composed_dialogue)
+            valid_output: bool = self.guardrail.validate(composed_dialogue)
+            if not valid_output:
+                logger.info(f"Dialogue refused for fairness violation.")
+                return None
 
             self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
 

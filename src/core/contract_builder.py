@@ -80,6 +80,7 @@ class ContractBuilder:
                 main_character_context,
                 dialogue_history_prompt,
                 GENERAL_RULES_PROMPT,
+                FAIRNESS_BASE_RULES_PROMPT
             ]
         )
         return result

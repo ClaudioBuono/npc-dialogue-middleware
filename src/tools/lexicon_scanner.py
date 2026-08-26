@@ -15,7 +15,7 @@ class FastLexiconScanner:
             self.automaton.add_word(term.lower(), term.lower())
         self.automaton.make_automaton()
 
-    def scan_advanced(self, text: str) -> list[str]:
+    def scan(self, text: str) -> list[str]:
         """Scans input text for matches bounded by whole-word boundaries.
 
         Ignores matches embedded inside larger alphanumeric words by verifying

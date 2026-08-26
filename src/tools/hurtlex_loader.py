@@ -15,9 +15,6 @@ def load_derogatory_terms() -> set[str]:
     """
     # Load HurtLex TSV file
     hurtlex_df = pd.read_csv("src/tools/hurtlex_EN.tsv", sep="\t")
-
-    # Filter for the 'conservative' confidence level
-    conservative_df = hurtlex_df[hurtlex_df["level"] == "conservative"]
-
+    
     # Extract unique lemmas, dropping any null values
-    return set(conservative_df["lemma"].dropna().tolist())
+    return set(hurtlex_df["lemma"].dropna().tolist())
