@@ -9,3 +9,9 @@ class ComplexityTier(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+
+
+class Language(str, Enum):
+
+    ENGLISH = "en"
+    ITALIAN = "it"

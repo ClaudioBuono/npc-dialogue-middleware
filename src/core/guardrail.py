@@ -33,7 +33,7 @@ class Guardrail:
 
         # Combine all valid string fields into a single text payload for scanning
         raw_Text = " ".join(val for val in fields if isinstance(val, str))
-
+        
         # Scan for banned words 
         start_time = time.perf_counter()
         scan_result: list[str] = self.lexicon_scanner.scan(raw_Text)
@@ -41,4 +41,4 @@ class Guardrail:
         logger.debug(f"Output scanned in {execution_time_ms}ms.")
         logger.info(f"Fairness scan '{scan_result}'")
 
-        return scan_result == 0
+        return len(scan_result) == 0

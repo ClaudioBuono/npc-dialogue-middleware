@@ -4,6 +4,8 @@ import json
 import dataclasses
 from pydantic import BaseModel
 
+from core.config.settings import Settings
+
 def setup_logging(level=logging.INFO):
     """
     Configure logging for the entire project.
@@ -35,7 +37,7 @@ def setup_logging(level=logging.INFO):
 
     # File Handler
     # TODO: replace with the actual telemetry store once implemented
-    file_handler = logging.FileHandler("npc_middleware.log", mode="a", encoding="utf-8")
+    file_handler = logging.FileHandler(Settings().telemetry_path, mode="a", encoding="utf-8")
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 

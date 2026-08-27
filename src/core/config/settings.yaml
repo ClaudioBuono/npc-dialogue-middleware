@@ -1,0 +1,6 @@
+# config/settings.yaml
+default_language: "it"
+llm:
+  default_temperature: 0.8
+  default_max_tokens: 1500
+  model: "claude-sonnet-4-6"
