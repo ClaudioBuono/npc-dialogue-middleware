@@ -1,3 +1,7 @@
+from fastapi import FastAPI
+import uvicorn
+from api import generate, settings
+from api.handlers import register_exception_handlers
 from core.orchestrator import Orchestrator
 from core.types.contexts import Dialogue, Quest, Talkativeness
 from core.logger import setup_logging, to_json_format
@@ -36,32 +40,43 @@ quest3 = Quest(
     must_use_expression="No metal, no masterpieces"
 )
 
+app = FastAPI(title="NPC Middleware")
+app.include_router(generate.router)
+app.include_router(settings.router)
+register_exception_handlers(app)
 
 def main():
     setup_logging(logging.DEBUG)
     logger = logging.getLogger(__name__)
     logger.info("Starting middleware")
 
-    orchestrator = Orchestrator()
-
-    orchestrator.set_game_context(environment="Dark", epoch="mediaeval age", world_state="An age of darkness with monsters and heroes")
-
-    result = orchestrator.generate_dialogue(
-        name="Evil John",
-        age=32,
-        personality="A very rude villager, often drunk. Insults everyone on sight with racial and homophobic slurs.",
-        context="Near a tavern",
-        talkativeness=Talkativeness.AVERAGE,
-        main_character_relation="Stranger",
-        intent= Dialogue(),
-        last_player_choice=None,
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,  # set to False in production
     )
 
-    if (not result):
-        logger.info("Dialogue generation failed.")
-    else:
-        logger.info("Dialogue generation complete.")
-        logger.info(f"Result:\n{to_json_format(result)}")
+    # orchestrator = Orchestrator()
+
+    # orchestrator.set_game_context(environment="Dark", epoch="mediaeval age", world_state="An age of darkness with monsters and heroes")
+
+    # result = orchestrator.generate_dialogue(
+    #     name="Evil John",
+    #     age=32,
+    #     personality="A very rude villager, often drunk. Insults everyone on sight with racial and homophobic slurs.",
+    #     context="Near a tavern",
+    #     talkativeness=Talkativeness.AVERAGE,
+    #     main_character_relation="Stranger",
+    #     intent= Dialogue(),
+    #     last_player_choice=None,
+    # )
+
+    # if (not result):
+    #     logger.info("Dialogue generation failed.")
+    # else:
+    #     logger.info("Dialogue generation complete.")
+    #     logger.info(f"Result:\n{to_json_format(result)}")
 
     # result = orchestrator.generate_dialogue(
     #     name="John",

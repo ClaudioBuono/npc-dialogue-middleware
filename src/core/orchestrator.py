@@ -71,12 +71,13 @@ class Orchestrator:
 
     # Orchestrator Methods ----------------------------------------------------------------------------
 
-    def set_game_context(self, environment: str, epoch: str, world_state: str) -> None:
+    def set_game_context(self, environment: str, epoch: str, world_state: str, main_character_description: str | None) -> None:
         """Set the game context by validating environment, epoch, and lore."""
         game_context = GameContext(
             epoch=epoch,
             environment=environment,
             world_state=world_state,
+            main_character_description=main_character_description
         )
         self.game_context = pre_processing.validate_game_context(game_context)
 
@@ -117,7 +118,7 @@ class Orchestrator:
             validated_npc_context = pre_processing.validate_npc_context(npc_context)
             contract = self.contract_builder.build(self.game_context, validated_npc_context, self.dialogue_history.get_dialogue_history())
 
-            configs = load_config_from_file("src/modelconfigs_test.json")
+            configs = load_config_from_file("modelconfigs.json")
 
             ModelRegistry().set_models(configs,profiler=False)
 
@@ -142,3 +143,8 @@ class Orchestrator:
 
 
             return composed_dialogue
+
+        else:
+            # TODO: Give a separate exception
+            logger.info("Game context was not set.")
+            return None

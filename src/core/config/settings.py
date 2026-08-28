@@ -1,3 +1,4 @@
+import logging
 from pydantic import BaseModel, Field
 from pathlib import Path
 from threading import Lock
@@ -5,6 +6,7 @@ import yaml
 
 from core.types.enums import Language
 
+logger = logging.getLogger(__name__)
 
 class LLMSettings(BaseModel):
     default_temperature: float = Field(0.7, ge=0.0, le=2.0)
@@ -14,7 +16,7 @@ class LLMSettings(BaseModel):
 class AppSettings(BaseModel):
     language: Language = Language.ENGLISH
     llm: LLMSettings = Field(default_factory=LLMSettings)
-    telemetry_path: str = "logs/npc_middleware.log"
+    telemetry_path: str = "logs/npc_middleware.log" # TODO: Does not create folder if it doesnt exist
     profanity_filter: bool = True
 
     # add other config sections here as needed
@@ -25,10 +27,11 @@ class Settings:
     Singleton that loads the application configuration from a YAML file
     and exposes its attributes directly, e.g. Settings().telemetry_path
     """
+    
     _instance: "Settings | None" = None
     _lock: Lock = Lock()
     _settings: AppSettings | None = None
-    _config_path: str | Path = "src/core/config/settings.yaml"
+    _config_path: str | Path = Path(__file__).parent / "settings.yaml"
 
     def __new__(cls, config_path: str | Path | None = None) -> "Settings":
         if cls._instance is None:
@@ -40,6 +43,7 @@ class Settings:
 
     def _init_settings(self, config_path: str | Path) -> None:
         """Load configuration from disk and validate it against AppSettings."""
+
         path = Path(config_path)
         if not path.exists():
             raise FileNotFoundError(f"Config file not found: {path}")
@@ -52,14 +56,17 @@ class Settings:
         Called only if the attribute is not found on the instance itself,
         so it delegates to the loaded config (e.g. .telemetry_path, .llm, .language)
         """
+
         settings = type(self)._settings
         if settings is not None and hasattr(settings, item):
             return getattr(settings, item)
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
 
+    # TODO: settings file should be outside of the codebase
     @classmethod
     def reload(cls, config_path: str | Path = "config/settings.yaml") -> "Settings":
         """Force a reload from disk, bypassing the cache."""
+
         cls._settings = None
         cls._instance = None
         return cls(config_path)
@@ -67,6 +74,7 @@ class Settings:
     @classmethod
     def save(cls, config_path: str | Path | None = None) -> None:
         """Persist the current settings back to the YAML file on disk."""
+
         if cls._settings is None:
             cls()  # force loading with defaults first
         path = Path(config_path or cls._config_path)
@@ -79,13 +87,17 @@ class Settings:
     @classmethod
     def change_language(cls, language: Language) -> None:
         """Update the active language, loading defaults first if needed."""
+
         if cls._settings is None:
             cls()  # force loading with defaults
         cls._settings.language = language
+        logger.info(f"Language changed to {language.index}")
 
     @classmethod
     def toggle_profanity_filter(cls, flag: bool) -> None:
         """Enable or disable the profanity filter, loading defaults first if needed."""
+
         if cls._settings is None:
             cls()  # force loading with defaults
         cls._settings.profanity_filter = flag
+        logger.info(f"Profanity filter { "ON" if flag else "OFF"}")
