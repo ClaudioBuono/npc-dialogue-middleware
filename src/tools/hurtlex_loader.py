@@ -1,5 +1,4 @@
 import pandas as pd
-
 from core.paths import resource_path
 HURTLEX_PATH = resource_path("hurtlex_EN.tsv")
 

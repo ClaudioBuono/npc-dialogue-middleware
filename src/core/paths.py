@@ -13,5 +13,5 @@ def resource_path(relative_path: str) -> Path:
     if getattr(sys, "frozen", False):
         base = Path(sys._MEIPASS)
     else:
-        base = Path(__file__).parent
+        base = Path(__file__).parent.parent / "tools"
     return base / relative_path
