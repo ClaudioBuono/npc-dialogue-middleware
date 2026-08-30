@@ -5,6 +5,10 @@ from core.types.dataclasses import ComposedDialogue
 
 router = APIRouter(tags=["dialogue"])
 
+@router.get("/health")
+def health():
+    return {"status": "ok"}
+
 @router.post("/set-game-context")
 def set_game_context(game_context: GameContext):
 	Orchestrator().set_game_context(

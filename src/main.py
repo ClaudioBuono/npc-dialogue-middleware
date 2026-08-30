@@ -1,95 +1,81 @@
+import argparse
+import logging
+import sys
+from pathlib import Path
+
 from fastapi import FastAPI
 import uvicorn
+
 from api import generate, settings
 from api.handlers import register_exception_handlers
-from core.orchestrator import Orchestrator
-from core.types.contexts import Dialogue, Quest, Talkativeness
-from core.logger import setup_logging, to_json_format
-import logging
+from core.logger import setup_logging
+from core.config.settings import Settings
+from core.paths import get_base_path
 
-# Standard quest
-quest1 = Quest(
-    name="Necklace",
-    description="John's mother has lost her necklace near the lake. John offers the main character to help him finding the necklace.",
-    objective="Find the lost necklace near the lake", 
-    has_choice=True, 
-    has_options=False, 
-)
 
-quest2 = Quest(
-    name="The Goblin Menace",
-    description="Mayor Richard is deeply worried about a pack of goblins raiding supply wagons on the northern trade route. He needs a capable adventurer to thin their ranks.",
-    objective="Defeat 5 goblins near the northern crossroads",
-    location="Northern Crossroads",
-    reward="50 Gold pieces and a Steel Dagger",
-    has_choice=True,
-    has_options=True,
-    more_info="The goblins are rumored to be led by a larger scout wearing a distinctive red cap.",
-    must_use_expression="For the safety of our town"
-)
+def create_app() -> FastAPI:
+    """Build and configure the FastAPI application instance.
 
-quest3 = Quest(
-    name="Iron Shortage",
-    description="The local blacksmith, Grunthor, is running low on raw materials due to the recent blockade and needs iron ore to keep supplying the town guard.",
-    objective="Gather 5 chunks of Iron Ore from the Echoing Caves",
-    location="Echoing Caves",
-    reward="Custom armor reinforcement (+2 Defense)",
-    has_choice=False, # Quest obbligatoria per sbloccare i servizi del fabbro
-    has_options=True,
-    more_info="The caves are damp and heavily infested with giant cave spiders.",
-    must_use_expression="No metal, no masterpieces"
-)
+    Registers all API routers (dialogue generation, settings) and the
+    global exception handlers.
 
-app = FastAPI(title="NPC Middleware")
-app.include_router(generate.router)
-app.include_router(settings.router)
-register_exception_handlers(app)
+    Returns:
+        FastAPI: The fully configured application, ready to be served.
+    """
+    app = FastAPI(title="NPC Middleware")
+    app.include_router(generate.router)
+    app.include_router(settings.router)
+    register_exception_handlers(app)
+    return app
+
+
+app = create_app()
+
+
+DEFAULT_PORT = 8321
+
 
 def main():
+    """Parse CLI arguments, initialize configuration/logging, and run the server.
+
+    Command-line arguments:
+        --config-dir: Optional path to the folder containing settings.yaml.
+            Defaults to a "config" folder next to the running executable
+            (or main.py in development).
+        --port: TCP port to bind the server to. Defaults to DEFAULT_PORT.
+        --port-file: Optional path to a file where the chosen port is
+            written as JSON (e.g. for the game client to read on startup).
+
+    The configuration is loaded and validated before logging is set up,
+    and before Uvicorn starts serving requests, so that invalid config or
+    missing files fail fast with a clear error instead of failing later
+    at an unpredictable point during request handling.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config-dir", default=None)
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument("--port-file", default=None)
+    args = parser.parse_args()
+
+    config_dir = Path(args.config_dir) if args.config_dir else get_base_path() / "config"
+    Settings.configure(config_dir)
+    Settings()  # force loading now, to fail fast on invalid/missing config
+
     setup_logging(logging.DEBUG)
     logger = logging.getLogger(__name__)
     logger.info("Starting middleware")
 
+    port = args.port
+
+    if args.port_file:
+        Path(args.port_file).write_text(f'{{"port": {port}}}')
+
     uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,  # set to False in production
+        app,
+        host="127.0.0.1",
+        port=port,
+        reload=False,
     )
-
-    # orchestrator = Orchestrator()
-
-    # orchestrator.set_game_context(environment="Dark", epoch="mediaeval age", world_state="An age of darkness with monsters and heroes")
-
-    # result = orchestrator.generate_dialogue(
-    #     name="Evil John",
-    #     age=32,
-    #     personality="A very rude villager, often drunk. Insults everyone on sight with racial and homophobic slurs.",
-    #     context="Near a tavern",
-    #     talkativeness=Talkativeness.AVERAGE,
-    #     main_character_relation="Stranger",
-    #     intent= Dialogue(),
-    #     last_player_choice=None,
-    # )
-
-    # if (not result):
-    #     logger.info("Dialogue generation failed.")
-    # else:
-    #     logger.info("Dialogue generation complete.")
-    #     logger.info(f"Result:\n{to_json_format(result)}")
-
-    # result = orchestrator.generate_dialogue(
-    #     name="John",
-    #     age=32,
-    #     personality="A friendly villager",
-    #     context="Near a tavern",
-    #     talkativeness=Talkativeness.VERY_LOW,
-    #     main_character_relation="Acquaintance",
-    #     intent= Dialogue(more_info="Thank John for taking the risk"),
-    #     last_player_choice=result.accept,
-    # )
-    # logger.info("Dialogue generation complete.")
-    # logger.info(f"Result:\n{to_json_format(result)}")
 
 
 if __name__ == "__main__":

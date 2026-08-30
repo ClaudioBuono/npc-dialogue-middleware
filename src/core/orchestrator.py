@@ -51,8 +51,6 @@ class Orchestrator:
         self._iterations = 0
         self._initialized = True
 
-
-
     @classmethod
     def get_instance(cls) -> "Orchestrator":
         """
@@ -118,7 +116,7 @@ class Orchestrator:
             validated_npc_context = pre_processing.validate_npc_context(npc_context)
             contract = self.contract_builder.build(self.game_context, validated_npc_context, self.dialogue_history.get_dialogue_history())
 
-            configs = load_config_from_file("modelconfigs.json")
+            configs = load_config_from_file(Settings()._config_dir / "modelconfigs.json")
 
             ModelRegistry().set_models(configs,profiler=False)
 

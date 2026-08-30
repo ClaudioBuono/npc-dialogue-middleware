@@ -2,14 +2,24 @@ import logging
 import sys
 import json
 import dataclasses
+from pathlib import Path
 from pydantic import BaseModel
 
-from core.config.settings import Settings
+from core.paths import get_base_path
+
+LOG_FILENAME = "npc_middleware.log"
+
 
 def setup_logging(level=logging.INFO):
-    """
-    Configure logging for the entire project.
-    Sets up both a stream handler for stdout and a file handler for a log file.
+    """Configure logging for the entire project.
+
+    Sets up both a stream handler (stdout) and a file handler pointing to
+    a fixed log file location, relative to the executable's directory
+    (``<exe_dir>/logs/npc_middleware.log``).
+
+    Args:
+        level: The minimum logging level for the root logger
+            (e.g. logging.DEBUG, logging.INFO).
     """
     logger = logging.getLogger()
     logger.setLevel(level)
@@ -36,13 +46,25 @@ def setup_logging(level=logging.INFO):
     logging.getLogger("httpx").setLevel(logging.INFO)
 
     # File Handler
-    # TODO: replace with the actual telemetry store once implemented
-    file_handler = logging.FileHandler(Settings().telemetry_path, mode="a", encoding="utf-8")
+    # Fixed path: <exe_dir>/logs/npc_middleware.log
+    telemetry_path = get_base_path() / "logs" / LOG_FILENAME
+    telemetry_path.parent.mkdir(parents=True, exist_ok=True)  # create the folder if missing
+
+    file_handler = logging.FileHandler(telemetry_path, mode="a", encoding="utf-8")
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
+
 def to_json_format(obj) -> str:
-    """Pretty prints an object (dict, dataclass, pydantic model) as a JSON string."""
+    """Pretty-print an object (dict, dataclass, or Pydantic model) as a JSON string.
+
+    Args:
+        obj: The object to serialize. Can be a dict, list, dataclass,
+            Pydantic model, or any combination thereof.
+
+    Returns:
+        str: An indented (2-space) JSON string representation of ``obj``.
+    """
     def custom_encoder(o):
         if dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
