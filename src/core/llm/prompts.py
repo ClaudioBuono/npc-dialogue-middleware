@@ -26,10 +26,10 @@ QUEST_BASE_PROMPT = """
     the dialogue. Only use the given informations in the quest description, objective and more infos:
 """
 
-QUEST_CHOICE_PROMPT = """Generate accept and refuse options for the dialogue.
+QUEST_CHOICE_PROMPT = """Generate accept and refuse options for the dialogue, these are BEYOND the additional dialogue options.
                         They must refer to the quest objective"""
 
-DIALOGUE_OPTIONS_PROMPT = """Generate more options for the dialogue, to have more informations beyond accept/refuse, generate the following number of """
+DIALOGUE_OPTIONS_PROMPT = """Generate EXACTLY {number_of_options} dialogue options as more infos to the dialogue, these MUST BE INCLUDED along accept/refuse options if included"""
 
 ROLE_PROMPT = (
     "You are a narrative designer generating dialogue for NPCs (non-player "

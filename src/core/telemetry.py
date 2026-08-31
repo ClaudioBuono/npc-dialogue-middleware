@@ -5,7 +5,6 @@ import time
 import logging
 import threading
 from dataclasses import dataclass, asdict, field
-from typing import Iterator
 
 telemetry_logger = logging.getLogger("telemetry")  # raw log, one line per request
 

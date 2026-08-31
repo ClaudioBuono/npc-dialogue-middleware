@@ -20,7 +20,7 @@ class ComposedDialogue:
     """
     intent: Dialogue | Quest
     dialogue: str
-    options: List[str] | None
+    dialogue_options: List[str] | None
     accept: str | None
     refuse: str | None
 

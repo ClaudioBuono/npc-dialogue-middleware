@@ -44,35 +44,51 @@ def run_debug():
 
     _setup_telemetry_store()
 
-    orchestrator.set_game_context(environment="Dark", epoch="mediaeval age", world_state="An age of darkness with monsters and heroes", main_character_description=None)
+    orchestrator.set_game_context(
+        environment="Dark",
+        epoch="mediaeval age",
+        world_state="An age of darkness with monsters and heroes",
+        main_character_description=None,
+    )
+
+    npc_context_1_data = {
+        "name": "Grukk",
+        "age": 34,
+        "personality": "Aggressive, rude, evil",
+        "context": "Leader of a group of goblins, hunting for humans",
+        "intent": {
+            "type":"Quest",
+            "objective": "Hunt for 10 hogs in the near forest",
+            "reward": "50 coins",
+            "name": "Hogs hunting",
+            "location": "Black forest",
+            "description": "Hogs are destroying our village, we need help to kill them",
+            "has_options": True,
+            "has_choice": True
+        },
+        "talkativeness": "Talkative",
+        "main_character_relation": "Stranger",
+        "recent_plot": None,
+        "visual_description": "Green skin, bald head, armed with a bow and leather armor",
+        "backstory": None,
+        "language": ["Goblinoid"],
+    }
+
+    # Conversione diretta del dict in un'istanza validata di NPCContext
+    npc_context_1 = NPCContext.model_validate(npc_context_1_data)
 
     result = orchestrator.generate_dialogue(
-        name="Evil John",
-        age=32,
-        personality="A very rude villager, often drunk. Insults everyone on sight with racial and homophobic slurs.",
-        context="Near a tavern",
-        talkativeness=Talkativeness.AVERAGE,
-        main_character_relation="Stranger",
-        intent= Dialogue(),
+        name=npc_context_1.name,
+        age=npc_context_1.age,
+        personality=npc_context_1.personality,
+        context=npc_context_1.context,
+        talkativeness=npc_context_1.talkativeness,
+        main_character_relation=npc_context_1.main_character_relation,
+        intent=npc_context_1.intent,
         last_player_choice=None,
     )
 
-    result = orchestrator.generate_dialogue(
-        name="Evil John",
-        age=32,
-        personality="A very rude villager, often drunk. Insults everyone on sight with racial and homophobic slurs.",
-        context="Near a tavern",
-        talkativeness=Talkativeness.AVERAGE,
-        main_character_relation="Stranger",
-        intent= Quest(
-            objective="Talk some sense into Evil John",
-            description="Evil John has been doin this for far too long. It's time to put an end to his behaviour.",
-            reward="An hug from Evil John",  
-        ),
-        last_player_choice=None,
-    )
-
-    if (not result):
+    if not result:
         logger.info("Dialogue generation failed.")
     else:
         logger.info("Dialogue generation complete.")

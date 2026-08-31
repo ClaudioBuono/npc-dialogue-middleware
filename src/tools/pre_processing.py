@@ -123,9 +123,6 @@ def validate_npc_context(context: NPCContext) -> NPCContext:
     elif len(main_character_relation) > MAX_RELATION_LENGTH:
         errors.append(f"Field 'main_character_relation' must not exceed {MAX_RELATION_LENGTH} characters.")
 
-    # `talkativeness` is an Enum: Pydantic already guarantees it's one of
-    # the valid members at the type level, so no further checks are needed here.
-
     # --- Optional fields ---
 
     recent_plot = context.recent_plot.strip() if context.recent_plot else None
@@ -151,10 +148,29 @@ def validate_npc_context(context: NPCContext) -> NPCContext:
 
     # --- Nested validation: intent (Quest | Dialogue) ---
 
-    if isinstance(context.intent, Quest):
-        normalized_intent, intent_errors = _validate_quest(context.intent)
+    normalized_intent: Quest | Dialogue
+    intent_errors: list[str]
+
+    if context.intent.type == "Quest":
+        if not isinstance(context.intent, Quest):
+            errors.append(
+                "Field 'intent.type' is 'Quest' but the object is not a Quest instance."
+            )
+            normalized_intent, intent_errors = context.intent, []
+        else:
+            normalized_intent, intent_errors = _validate_quest(context.intent)
+    elif context.intent.type == "Dialogue":
+        if not isinstance(context.intent, Dialogue) or isinstance(context.intent, Quest):
+            errors.append(
+                "Field 'intent.type' is 'Dialogue' but the object is not a plain Dialogue instance."
+            )
+            normalized_intent, intent_errors = context.intent, []
+        else:
+            normalized_intent, intent_errors = _validate_dialogue(context.intent)
     else:
-        normalized_intent, intent_errors = _validate_dialogue(context.intent)
+        errors.append(f"Unknown value for field 'intent.type': '{context.intent.type}'.")
+        normalized_intent, intent_errors = context.intent, []
+
     errors.extend(intent_errors)
 
     if errors:
@@ -240,6 +256,7 @@ def _validate_quest(quest: Quest) -> tuple[Quest, list[str]]:
         errors.append(f"Field 'intent.reward' must not exceed {MAX_QUEST_REWARD_LENGTH} characters.")
 
     normalized = Quest(
+        type="Quest",
         must_use_expression=must_use_expression,
         more_info=more_info,
         has_options=quest.has_options,
@@ -266,6 +283,7 @@ def _validate_dialogue(dialogue: Dialogue) -> tuple[Dialogue, list[str]]:
     must_use_expression, more_info, errors = _validate_dialogue_base_fields(dialogue)
 
     normalized = Dialogue(
+        type="Dialogue",
         must_use_expression=must_use_expression,
         more_info=more_info,
         has_options=dialogue.has_options,

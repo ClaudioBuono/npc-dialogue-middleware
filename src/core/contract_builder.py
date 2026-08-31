@@ -1,4 +1,5 @@
 from typing import Any, Dict
+from core.config.settings import Settings
 from core.types.dataclasses import Contract
 from core.types.contexts import *
 from core.llm.prompts import *
@@ -131,7 +132,7 @@ class ContractBuilder:
         if dialogue.has_options:
             # NOTE: was `DIALOGUE_OPTIONS_PROMPT + 4` (str + int -> TypeError).
             # Assuming DIALOGUE_OPTIONS_PROMPT is a format string taking max options count.
-            lines.append(DIALOGUE_OPTIONS_PROMPT.format(4))
+            lines.append(DIALOGUE_OPTIONS_PROMPT.format(number_of_options = Settings().number_of_options))
 
         result = "\n".join(lines)
         return result
@@ -228,12 +229,12 @@ class ContractBuilder:
         """
         properties: dict[str, Any] = {}
 
-        # More dialogue options are avaiable only if more_infos are provided
-        if dialogue.more_info and dialogue.has_options:
-            properties["additional_options"] = {
+        # More dialogue options
+        if dialogue.has_options:
+            properties["dialogue_options"] = {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Must include additional options the player can choose "
+                "description": "Must include the player can choose "
                             "from in response (e.g. asking for more details)."
             }
 

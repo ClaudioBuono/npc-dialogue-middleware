@@ -29,7 +29,7 @@ class DialogueOutputComposer:
         if not isinstance(player_options, dict):
             raise ValueError(f"Invalid 'player_options' field in output: {player_options}")
 
-        additional_options = player_options.get("additional_options")
+        dialogue_options = player_options.get("dialogue_options")
         accept = player_options.get("accept")
         refuse = player_options.get("refuse")
 
@@ -44,7 +44,7 @@ class DialogueOutputComposer:
         return ComposedDialogue(
             intent,
             dialogue_text,
-            options=additional_options,
+            dialogue_options=dialogue_options,
             accept=accept,
             refuse=refuse,
         )

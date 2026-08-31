@@ -1,5 +1,6 @@
 # config/settings.yaml
 default_language: "en"
+number_of_options: 3
 llm:
   default_temperature: 0.8
   default_max_tokens: 1500
