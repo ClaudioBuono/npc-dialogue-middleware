@@ -14,6 +14,7 @@ class FastLexiconScanner:
         for term in terms:
             self.automaton.add_word(term.lower(), term.lower())
         self.automaton.make_automaton()
+        self.max_len = max((len(t) for t in terms), default=0)
 
     def scan(self, text: str) -> list[str]:
         """Scans input text for matches bounded by whole-word boundaries.
@@ -51,3 +52,52 @@ class FastLexiconScanner:
                 matched_terms.append(term)
 
         return matched_terms
+
+class StreamingLexiconScanner:
+    """Scan state for a single streaming."""
+
+    def __init__(self, lexicon: 'FastLexiconScanner') -> None:
+        self._automaton = lexicon.automaton
+        self._max_len = lexicon.max_len
+        self._tail = ""
+        self._global_offset = 0
+        self._pending: tuple[str, int] | None = None
+
+    def _raw_matches(self, text: str) -> list[tuple[int, int, str]]:
+        return [
+            (end - len(term) + 1, end, term)
+            for end, term in self._automaton.iter(text)
+        ]
+
+    def feed(self, chunk: str) -> list[str]:
+        window = self._tail + chunk.lower()
+        tail_len = len(self._tail)
+        window_len = len(window)
+        confirmed: list[str] = []
+
+        for start, end, term in self._raw_matches(window):
+            if end < tail_len:
+                continue
+            global_start = self._global_offset + start
+            if start == 0 and global_start != 0:
+                continue
+            if start > 0 and window[start - 1].isalnum():
+                continue
+            if end == window_len - 1:
+                self._pending = (term, global_start)
+                continue
+            if not window[end + 1].isalnum():
+                confirmed.append(term)
+
+        keep = self._max_len
+        drop = max(0, window_len - keep)
+        self._global_offset += drop
+        self._tail = window[-keep:] if keep else ""
+        return confirmed
+
+    def flush(self) -> list[str]:
+        if self._pending:
+            term, _ = self._pending
+            self._pending = None
+            return [term]
+        return []

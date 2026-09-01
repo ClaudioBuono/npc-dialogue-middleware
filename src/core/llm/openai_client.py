@@ -46,6 +46,7 @@ class OpenAICompatibleClient(BaseLLMClient):
                 timeout) or if the model returns an empty/non-text response.
         """
         request = self._format_request(contract, temperature)
+        logger.debug(f"Formatted request: \n {request}")
         request["stream"] = True
         request["stream_options"] = {"include_usage": True}
         logger.debug(f"Sending request to OpenAI client:\n{to_json_format(request)}")

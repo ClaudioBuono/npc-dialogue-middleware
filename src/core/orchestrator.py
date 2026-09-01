@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Iterator
 import logging
 from core.config.settings import Settings
 from core.contract_builder import ContractBuilder
@@ -50,6 +50,10 @@ class Orchestrator:
 
         self._iterations = 0
         self._initialized = True
+
+        # Load models 
+        configs = load_config_from_file(Settings()._config_dir / "modelconfigs.json")
+        ModelRegistry().set_models(configs, profiler=False)
 
     @classmethod
     def get_instance(cls) -> "Orchestrator":
@@ -116,10 +120,6 @@ class Orchestrator:
             validated_npc_context = pre_processing.validate_npc_context(npc_context)
             contract = self.contract_builder.build(self.game_context, validated_npc_context, self.dialogue_history.get_dialogue_history())
 
-            configs = load_config_from_file(Settings()._config_dir / "modelconfigs.json")
-
-            ModelRegistry().set_models(configs,profiler=False)
-
             client: OpenAICompatibleClient = self.llm_router.select_model(game_context = self.game_context, npc_context = validated_npc_context)
             logger.debug(f"Selected LLM client: {type(client).__name__}")
 
@@ -146,3 +146,81 @@ class Orchestrator:
             # TODO: Give a separate exception
             logger.info("Game context was not set.")
             return None
+
+    def generate_dialogue_stream(
+        self,
+        name: str,
+        age: int,
+        personality: str,
+        context: str,
+        talkativeness: Talkativeness,
+        main_character_relation: str,
+        intent: Quest | Dialogue,
+        last_player_choice: Optional[str]
+    ) -> Iterator[str]:
+        
+        """Generate NPC dialogue using the NPC and game context via streaming."""
+
+        logger.info(f"Generating dialogue stream for NPC '{name}'")
+
+        if self.game_context:
+
+            self._iterations += 1
+
+            if last_player_choice:
+                self.dialogue_history.add_player_dialogue_to_history(last_player_choice)
+                logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
+            
+            npc_context = NPCContext(
+                name=name,
+                age=age,
+                personality=personality,
+                context=context,
+                talkativeness=talkativeness,
+                main_character_relation=main_character_relation,
+                intent=intent,
+            )
+            validated_npc_context = pre_processing.validate_npc_context(npc_context)
+            contract = self.contract_builder.build(self.game_context, validated_npc_context, self.dialogue_history.get_dialogue_history())
+
+            client: OpenAICompatibleClient = self.llm_router.select_model(game_context = self.game_context, npc_context = validated_npc_context)
+            logger.debug(f"Selected LLM client: {type(client).__name__}")
+
+            self.dialogue_generator.set_client(client)
+            stream = self.dialogue_generator.generate_stream(contract)
+            
+            scanner = None
+            if Settings().profanity_filter:
+                scanner = self.guardrail.get_streaming_scanner()
+
+            full_dialogue = ""
+            refused = False
+
+            for chunk in stream:
+                if scanner:
+                    matches = scanner.feed(chunk)
+                    if matches:
+                        logger.info(f"Dialogue stream refused for fairness violation during generation. Matches: {matches}")
+                        refused = True
+                        break
+                
+                full_dialogue += chunk
+                yield chunk
+
+            if scanner and not refused:
+                matches = scanner.flush()
+                if matches:
+                    logger.info(f"Dialogue stream refused for fairness violation at end of stream. Matches: {matches}")
+                    refused = True
+
+            if not refused:
+                try:
+                    composed_dialogue = self.dialogue_composer.compose_dialogue(validated_npc_context, full_dialogue)
+                    self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
+                    logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
+                except Exception as e:
+                    logger.error(f"Failed to compose dialogue after stream: {e}")
+
+        else:
+            logger.info("Game context was not set.")
+            return

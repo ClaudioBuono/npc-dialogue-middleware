@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import StreamingResponse
 from core.orchestrator import Orchestrator
 from core.types.contexts import GameContext, NPCContext
 from core.types.dataclasses import ComposedDialogue
@@ -40,3 +41,24 @@ def generate_dialogue(npc_context: NPCContext):
         )
 
 	return dialogue
+
+@router.post("/generate-dialogue-stream")
+def generate_dialogue_stream(npc_context: NPCContext):
+	if Orchestrator().game_context is None:
+		raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Game context is not set.",
+        )
+
+	stream = Orchestrator().generate_dialogue_stream(
+		npc_context.name,
+		npc_context.age,
+		npc_context.personality,
+		npc_context.context,
+		npc_context.talkativeness,
+		npc_context.main_character_relation,
+		npc_context.intent,
+		None
+	)
+
+	return StreamingResponse(stream, media_type="text/plain")

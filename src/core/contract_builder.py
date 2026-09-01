@@ -228,6 +228,7 @@ class ContractBuilder:
         (Quest included), based on has_options.
         """
         properties: dict[str, Any] = {}
+        required: list[str] = []
 
         # More dialogue options
         if dialogue.has_options:
@@ -237,6 +238,7 @@ class ContractBuilder:
                 "description": "Must include the player can choose "
                             "from in response (e.g. asking for more details)."
             }
+            required.append("dialogue_options")
 
         if not properties:
             return None
@@ -244,6 +246,7 @@ class ContractBuilder:
         return {
             "type": "object",
             "properties": properties,
+            "required": required,
             "additionalProperties": False
         }
 
@@ -253,6 +256,7 @@ class ContractBuilder:
         (accept/refuse), added on top of whatever the base Dialogue already built.
         """
         properties: dict[str, Any] = dict(base_schema["properties"]) if base_schema else {}
+        required: list[str] = list(base_schema.get("required", [])) if base_schema else []
 
         if quest.has_choice:
             properties["accept"] = {
@@ -263,12 +267,17 @@ class ContractBuilder:
                 "type": "string",
                 "description": "Player dialogue option to refuse the quest."
             }
+            required.extend(["accept", "refuse"])
 
         if not properties:
             return None
 
-        return {
+        schema = {
             "type": "object",
             "properties": properties,
             "additionalProperties": False
         }
+        if required:
+            schema["required"] = required
+            
+        return schema

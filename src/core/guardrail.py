@@ -1,7 +1,7 @@
 import logging
 import time
 from tools.hurtlex_loader import load_derogatory_terms
-from tools.lexicon_scanner import FastLexiconScanner
+from tools.lexicon_scanner import FastLexiconScanner, StreamingLexiconScanner
 from core.types.dataclasses import ComposedDialogue
 
 logger = logging.getLogger(__name__)
@@ -42,3 +42,8 @@ class Guardrail:
         logger.info(f"Fairness scan '{scan_result}'")
 
         return len(scan_result) == 0
+
+    def get_streaming_scanner(self) -> StreamingLexiconScanner:
+        """Returns a new StreamingLexiconScanner instance for a single stream."""
+        from tools.lexicon_scanner import StreamingLexiconScanner
+        return StreamingLexiconScanner(self.lexicon_scanner)
