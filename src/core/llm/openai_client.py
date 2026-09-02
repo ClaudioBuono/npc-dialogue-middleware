@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Iterator
 import httpx
@@ -46,10 +47,11 @@ class OpenAICompatibleClient(BaseLLMClient):
                 timeout) or if the model returns an empty/non-text response.
         """
         request = self._format_request(contract, temperature)
-        logger.debug(f"Formatted request: \n {request}")
+        logger.debug(f"Raw request: \n {request}")
         request["stream"] = True
         request["stream_options"] = {"include_usage": True}
-        logger.debug(f"Sending request to OpenAI client:\n{to_json_format(request)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            self._log_human_readable_request(request)
 
         recorder = TelemetryRecorder(self._model_identifier)
         chunks: list[str] = []
@@ -115,11 +117,14 @@ class OpenAICompatibleClient(BaseLLMClient):
             Streams text chunks as they arrive, used for profiling (time
             to first token, throughput). See BaseLLMClient for full contract.
             """
-            request_kwargs = self._format_request(contract, temperature)
-            request_kwargs["stream"] = True
+            request = self._format_request(contract, temperature)
+            logger.debug(f"Raw request: \n {request}")
+            request["stream"] = True
+            if logger.isEnabledFor(logging.DEBUG):
+                self._log_human_readable_request(request)
 
             try:
-                stream = self._client.chat.completions.create(**request_kwargs, timeout=3.0)
+                stream = self._client.chat.completions.create(**request, timeout=3.0)
                 for chunk in stream:
                     delta = chunk.choices[0].delta.content
                     if delta:
@@ -230,3 +235,19 @@ class OpenAICompatibleClient(BaseLLMClient):
         except Exception:
             pass
         return None, "unavailable"
+
+    def _log_human_readable_request(self, request: dict):
+        """Logs the LLM request in a human-readable format."""
+        lines = [
+            "=================== LLM REQUEST ===================",
+            f"Model: {request.get('model')} | Temp: {request.get('temperature')}",
+        ]
+
+        for msg in request.get("messages", []):
+            role = msg.get("role", "").upper()
+            content = msg.get("content", "")
+            lines.append(f"\n--- ROLE: {role} ---\n{content}")
+
+        lines.append("===================================================")
+
+        logger.debug("\n".join(lines))
