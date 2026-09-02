@@ -243,11 +243,20 @@ class OpenAICompatibleClient(BaseLLMClient):
             f"Model: {request.get('model')} | Temp: {request.get('temperature')}",
         ]
 
+        # Message content (System / User)
         for msg in request.get("messages", []):
             role = msg.get("role", "").upper()
             content = msg.get("content", "")
             lines.append(f"\n--- ROLE: {role} ---\n{content}")
 
+        # Output Schema
+        response_format = request.get("response_format")
+        if response_format:
+            schema = response_format.get("json_schema", {}).get("schema", response_format)
+            formatted_schema = json.dumps(schema, indent=2, ensure_ascii=False)
+            lines.append(f"\n--- OUTPUT SCHEMA ---\n{formatted_schema}")
+
         lines.append("===================================================")
 
         logger.debug("\n".join(lines))
+
