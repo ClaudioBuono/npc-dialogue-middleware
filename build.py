@@ -1,6 +1,7 @@
 import shutil
 import subprocess
 import sys
+import argparse
 from pathlib import Path
 
 ROOT = Path(__file__).parent
@@ -12,22 +13,16 @@ BUILD_DIR = ROOT / "build"
 SPEC_DIR = ROOT
 RAW_DIST_DIR = ROOT / "dist"
 
-PACKAGE_DIR = ROOT / "npc_middleware"
-CONFIG_DEST = PACKAGE_DIR / "config"
-LOGS_DEST = PACKAGE_DIR / "logs"
-
 HURTLEX_SOURCE = SRC_DIR / "tools" / "hurtlex_EN.tsv"
 
 
 def sep() -> str:
     """Return the correct separator for PyInstaller's --add-data argument."""
-
     return ";" if sys.platform.startswith("win") else ":"
 
 
 def check_pyinstaller_installed():
     """Verify that PyInstaller is available in the current environment."""
-
     try:
         subprocess.run(
             [sys.executable, "-m", "PyInstaller", "--version"],
@@ -56,27 +51,30 @@ def run_pyinstaller():
     ], check=True, cwd=SRC_DIR)
 
 
-def assemble_package():
-    """Move the compiled executable and config templates into the final npc_middleware/ folder.
+def assemble_package(package_dir: Path):
+    """Move the compiled executable and config templates into the final npc_middleware output folder.
 
     Creates the config/ and logs/ subfolders if missing, copies the built
     executable from the raw PyInstaller dist output, and copies the default
     config files only if they don't already exist at the destination.
     """
-    PACKAGE_DIR.mkdir(parents=True, exist_ok=True)
-    CONFIG_DEST.mkdir(parents=True, exist_ok=True)
-    LOGS_DEST.mkdir(parents=True, exist_ok=True)
+    config_dest = package_dir / "config"
+    logs_dest = package_dir / "logs"
+
+    package_dir.mkdir(parents=True, exist_ok=True)
+    config_dest.mkdir(parents=True, exist_ok=True)
+    logs_dest.mkdir(parents=True, exist_ok=True)
 
     exe_name = "npc_middleware.exe" if sys.platform.startswith("win") else "npc_middleware"
     built_exe = RAW_DIST_DIR / exe_name
-    final_exe = PACKAGE_DIR / exe_name
+    final_exe = package_dir / exe_name
 
     shutil.copy(built_exe, final_exe)
     print(f"Copied executable to {final_exe}")
 
     for filename in ["settings.yaml", "modelconfigs.json"]:
         src = CONFIG_SRC / filename
-        dest = CONFIG_DEST / filename
+        dest = config_dest / filename
         if not dest.exists():
             shutil.copy(src, dest)
             print(f"Copied {filename} to {dest}")
@@ -88,7 +86,7 @@ def cleanup_raw_artifacts():
     """Remove intermediate build artifacts no longer needed after packaging.
 
     Deletes the raw PyInstaller dist/ and build/ folders and the generated
-    .spec file, leaving only the final PACKAGE_DIR as build output.
+    .spec file, leaving only the final package folder as build output.
     """
     shutil.rmtree(RAW_DIST_DIR, ignore_errors=True)
     shutil.rmtree(BUILD_DIR, ignore_errors=True)
@@ -118,25 +116,31 @@ def check_config_files_exist():
 
 
 def main():
-    """Run the full build pipeline: validate, compile, and package.
+    """Run the full build pipeline: validate, compile, and package."""
+    parser = argparse.ArgumentParser(description="Build and package npc_middleware.")
+    parser.add_argument(
+        "-out", "--output",
+        type=Path,
+        default=ROOT,
+        help="Output directory (default: project root)."
+    )
+    args = parser.parse_args()
 
-    Steps: verify PyInstaller is installed, verify config templates exist,
-    run PyInstaller, assemble the final distribution folder, and clean up
-    intermediate build artifacts.
-    """
-    print("== Building npc_middleware.exe ==")
+    package_dir = (args.output / "npc_middleware").resolve()
+
+    print(f"== Building npc_middleware (Target: {package_dir}) ==")
     check_pyinstaller_installed()
     check_config_files_exist()   # fail fast, before invoking PyInstaller
     run_pyinstaller()
 
-    print("== Assembling final package ==")
-    assemble_package()
+    print("\n== Assembling final package ==")
+    assemble_package(package_dir)
     cleanup_raw_artifacts()
 
-    print(f"\nDone. Package ready at: {PACKAGE_DIR}")
-    print(f"  {PACKAGE_DIR / 'npc_middleware.exe'}")
-    print(f"  {CONFIG_DEST}")
-    print(f"  {LOGS_DEST}")
+    print(f"\nDone. Package ready at: {package_dir}")
+    print(f"  {package_dir / ('npc_middleware.exe' if sys.platform.startswith('win') else 'npc_middleware')}")
+    print(f"  {package_dir / 'config'}")
+    print(f"  {package_dir / 'logs'}")
 
 
 if __name__ == "__main__":
