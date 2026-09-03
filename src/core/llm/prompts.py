@@ -49,11 +49,11 @@ QUEST_BASE_PROMPT = inspect.cleandoc("""
 """)
 
 QUEST_CHOICE_PROMPT = inspect.cleandoc("""
-    - Include explicitly 1 "Accept" option and 1 "Refuse" option in the player's choices. Both choices must directly address accepting or declining the quest's objective.
+    - Beyond the {number_of_options} additional dialogue options, include explicitly 1 "accept" option and 1 "refuse" option in the \"player_options\" field. Both choices must directly address accepting or declining the quest's objective FROM THE MAIN CHARACTER'S POINT OF VIEW.
 """)
 
 DIALOGUE_OPTIONS_PROMPT = inspect.cleandoc("""
-    - Generate EXACTLY {number_of_options} additional dialogue options allowing the player to ask for details or context. If Accept/Refuse choices are required, these inquiry options must be provided IN ADDITION to them.
+    - You MUST generate EXACTLY {number_of_options} additional dialogue options allowing the player to ask for details or context. These options MUST go into the \"dialogue_options\" field. NEVER allude at a possible acceptance or refusal of the quest when giving options. 
 """)
 
 ROLE_PROMPT = inspect.cleandoc("""
@@ -62,6 +62,7 @@ ROLE_PROMPT = inspect.cleandoc("""
 
 WORLD_CONTEXT_PROMPT = inspect.cleandoc("""
     Use the following worldbuilding directives to shape the tone, dialogue, and atmospheric details of all generated content.
+	
     WORLD CONTEXT:
     - Environment: {environment}
     - Epoch: {epoch}
@@ -79,6 +80,7 @@ DIALOGUE_HISTORY_PROMPT = inspect.cleandoc("""
 """)
 
 DIALOGUE_RULES_PROMPT = inspect.cleandoc("""
+
     TASK RULES:
 """)
 

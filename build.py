@@ -1,3 +1,4 @@
+import json
 import shutil
 import subprocess
 import sys
@@ -94,6 +95,25 @@ def cleanup_raw_artifacts():
     spec_file.unlink(missing_ok=True)
 
 
+def export_openapi(package_dir: Path):
+    """Export the OpenAPI schema to openapi.json inside the final package directory.
+
+    Temporarily injects SRC_DIR into sys.path so the FastAPI app can be
+    imported from build context, then calls app.openapi() to get the full
+    schema and dumps it as a formatted JSON file.
+    """
+    if str(SRC_DIR) not in sys.path:
+        sys.path.insert(0, str(SRC_DIR))
+
+    from main import app 
+
+    schema = app.openapi()
+    output_path = package_dir / "openapi.json"
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(schema, f, indent=2)
+    print(f"Exported OpenAPI schema to {output_path}")
+
+
 def check_config_files_exist():
     """Verify that the required config template files exist before building.
 
@@ -137,10 +157,14 @@ def main():
     assemble_package(package_dir)
     cleanup_raw_artifacts()
 
+    print("\n== Exporting OpenAPI schema ==")
+    export_openapi(package_dir)
+
     print(f"\nDone. Package ready at: {package_dir}")
     print(f"  {package_dir / ('npc_middleware.exe' if sys.platform.startswith('win') else 'npc_middleware')}")
     print(f"  {package_dir / 'config'}")
     print(f"  {package_dir / 'logs'}")
+    print(f"  {package_dir / 'openapi.json'}")
 
 
 if __name__ == "__main__":

@@ -205,9 +205,8 @@ class ContractBuilder:
 
 
         if isinstance(intent, Quest):
-
             if intent.has_choice:
-                lines.append(QUEST_CHOICE_PROMPT)
+                lines.append(QUEST_CHOICE_PROMPT.format(number_of_options = Settings().number_of_options))
 
 
         result = "\n".join(lines)
@@ -264,8 +263,8 @@ class ContractBuilder:
             properties["dialogue_options"] = {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Must include the player can choose "
-                            "from in response (e.g. asking for more details)."
+                "description": f"Must include {Settings().number_of_options} options the player can choose from in response (e.g. asking for more details)."
+                            " Must NEVER include explicit Accept and Refuse options."
             }
             required.append("dialogue_options")
 

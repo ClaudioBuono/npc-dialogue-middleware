@@ -124,7 +124,7 @@ class OpenAICompatibleClient(BaseLLMClient):
                 self._log_human_readable_request(request)
 
             try:
-                stream = self._client.chat.completions.create(**request, timeout=3.0)
+                stream = self._client.chat.completions.create(**request, timeout=67.0)
                 for chunk in stream:
                     delta = chunk.choices[0].delta.content
                     if delta:

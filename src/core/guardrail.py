@@ -25,9 +25,9 @@ class Guardrail:
         fields = [
             composed_output.dialogue,
             (
-                str(composed_output.dialogue_options)
-                if isinstance(composed_output.dialogue_options, list)
-                else composed_output.dialogue_options
+                str(composed_output.player_options)
+                if isinstance(composed_output.player_options, list)
+                else composed_output.player_options
             ),
         ]
 
