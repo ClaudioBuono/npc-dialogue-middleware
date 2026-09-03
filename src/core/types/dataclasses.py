@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, List, Union, Optional
 from pydantic import BaseModel, Field
 
-from core.types.contexts import Dialogue, Quest
+from core.types.contexts import Dialogue, NPCContext, Quest
 
 
 @dataclass
@@ -64,4 +64,18 @@ class ComposedDialogue(BaseModel):
     player_options: Optional[Union[QuestChoiceSchema, DialogueOptionsSchema]] = Field(
         None,
         description="Available choices for the player to respond."
+    )
+
+class DialogueStreamRequest(BaseModel):
+    """
+    Payload for initiating or continuing a streaming dialogue request with an NPC.
+    """
+    npc_context: NPCContext = Field(
+        ...,
+        description="The contextual profile and narrative state of the target NPC."
+    )
+    last_player_choice: Optional[str] = Field(
+        None,
+        description="The previous dialogue or quest option selected by the player, if any.",
+        examples=["Accept the quest"]
     )
