@@ -1,8 +1,7 @@
 import json
 from core.types.contexts import NPCContext
-from core.types.dataclasses import ComposedDialogue
+from core.types.dataclasses import ComposedDialogue, DialogueOptionsSchema, QuestChoiceSchema
 from core.types.contexts import Quest
-
 
 class DialogueOutputComposer:
 
@@ -35,16 +34,24 @@ class DialogueOutputComposer:
 
         intent = npc_context.intent
 
-        # Minimal consistency check: accept/refuse only make sense for a Quest with a choice
-        if (accept is not None or refuse is not None) and not isinstance(intent, Quest):
-            raise ValueError(
-                "'accept'/'refuse' fields present in output but intent is not a Quest."
-            )
+        parsed_options = None
+        if player_options:
+            if isinstance(intent, Quest):
+                # Minimal consistency check: accept/refuse only make sense for a Quest with a choice
+                if accept is not None or refuse is not None:
+                    parsed_options = QuestChoiceSchema(
+                        accept=accept,
+                        refuse=refuse,
+                        dialogue_options=dialogue_options
+                    )
+            else:
+                if dialogue_options is not None:
+                    parsed_options = DialogueOptionsSchema(
+                        dialogue_options=dialogue_options
+                    )
 
         return ComposedDialogue(
-            intent,
-            dialogue_text,
-            dialogue_options=dialogue_options,
-            accept=accept,
-            refuse=refuse,
+            intent=intent,
+            dialogue=dialogue_text,
+            player_options=parsed_options
         )

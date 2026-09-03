@@ -8,19 +8,23 @@ class Dialogue(BaseModel):
     """
     type: Literal["Dialogue"] = Field(
         "Dialogue",
-        description="Discriminator field that identifies this block as a plain Dialogue."
+        description="Discriminator field that identifies this block as a plain Dialogue.",
+        examples=["Dialogue"]
     )
     must_use_expression: Optional[str] = Field(
         None, 
-        description="Core piece of information or key message the NPC must communicate during the dialogue."
+        description="Core piece of information or key message the NPC must communicate during the dialogue.",
+        examples=["I used to be an adventurer like you."]
     )
     more_info: Optional[str] = Field(
         None,
-        description="Contextual details or background information to guide the generation and eventual player's dialogue choices."
+        description="Contextual details or background information to guide the generation and eventual player's dialogue choices.",
+        examples=["The NPC is secretly hiding a stolen ring."]
     )
     has_options: Optional[bool] = Field(
         False,
-        description="If True, additional dialogue options should be generated (e.g. asking for details)."
+        description="If True, additional dialogue options should be generated (e.g. asking for details).",
+        examples=[True, False]
     )
 
 class Quest(Dialogue):
@@ -31,16 +35,18 @@ class Quest(Dialogue):
     """
     type: Literal["Quest"] = Field(
         "Quest",
-        description="Discriminator field that identifies this block as a Quest."
+        description="Discriminator field that identifies this block as a Quest.",
+        examples=["Quest"]
     )
-    objective: str = Field(..., description="The main task or goal the player must accomplish to complete the quest.")
-    name: Optional[str] = Field(None, description="The title of the quest, if predetermined.")
-    description: Optional[str] = Field(None, description="Narrative introduction and lore summary of the quest.")
-    location: Optional[str] = Field(None, description="The specific zone, world location, or target area where the quest takes place.")
-    reward: Optional[str] = Field(None, description="The loot, experience, currency, or favor awarded to the player upon completion.")
+    objective: str = Field(..., description="The main task or goal the player must accomplish to complete the quest.", examples=["Find the lost sword of Elendil"])
+    name: Optional[str] = Field(None, description="The title of the quest, if predetermined.", examples=["The Lost Heirloom"])
+    description: Optional[str] = Field(None, description="Narrative introduction and lore summary of the quest.", examples=["An ancient sword was lost in the ruins of the old castle centuries ago."])
+    location: Optional[str] = Field(None, description="The specific zone, world location, or target area where the quest takes place.", examples=["Ruins of old Castle Dour"])
+    reward: Optional[str] = Field(None, description="The loot, experience, currency, or favor awarded to the player upon completion.", examples=["100 Gold Coins", "Sword of the Ancients"])
     has_choice: Optional[bool] = Field(
         False,
-        description="If True, the player can actively choose whether to accept or decline the quest."
+        description="If True, the player can actively choose whether to accept or decline the quest.",
+        examples=[True, False]
     )
 
 
@@ -63,19 +69,23 @@ class GameContext(BaseModel):
 
     epoch: str = Field(
         ..., 
-        description="The historical or thematic era of the story (e.g., Medieval, Hard Sci-Fi, Cyberpunk, High Fantasy)."
+        description="The historical or thematic era of the story (e.g., Medieval, Hard Sci-Fi, Cyberpunk, High Fantasy).",
+        examples=["Medieval Fantasy"]
     )
     environment: str = Field(
         ..., 
-        description="General description of the world's nature, atmosphere, climate, or architectural theme."
+        description="General description of the world's nature, atmosphere, climate, or architectural theme.",
+        examples=["Dark and gritty world with dangerous wilderness and imposing castles."]
     )
     world_state: str = Field(
         ..., 
-        description="The current global situation or major ongoing events in the world that everyone is aware of."
+        description="The current global situation or major ongoing events in the world that everyone is aware of.",
+        examples=["A recent war has left the kingdom in ruins and poverty is rampant."]
     )
     main_character_description: Optional[str] = Field(
         None,
-        description="Physical appearance of the protagonist. Include personality traits only if they are widely famous in the game world."
+        description="Physical appearance of the protagonist. Include personality traits only if they are widely famous in the game world.",
+        examples=["A tall warrior with a scar across his face, clad in heavy armor."]
     )
 
 
@@ -88,26 +98,30 @@ class NPCContext(BaseModel):
         discriminator="type",
         description="The current driving purpose of the conversation."
     )
-    name: str = Field(..., description="The full name, title, or alias of the NPC suitable for the game setting.")
-    age: int = Field(..., description="The age of the character.")
-    personality: str = Field(..., description="Psychological profile and behavioral traits of the NPC.")
-    context: str = Field(..., description="The immediate state of the NPC: their current location, time of day, weather, and current activity.")
-    talkativeness: Talkativeness = Field(..., description="How much the NPC tends to talk.") 
-    main_character_relation: str = Field(..., description="The NPC's current attitude, stance, and relationship status toward the protagonist.")
+    name: str = Field(..., description="The full name, title, or alias of the NPC suitable for the game setting.", examples=["Garrick the Blacksmith"])
+    age: int = Field(..., description="The age of the character.", examples=[45])
+    personality: str = Field(..., description="Psychological profile and behavioral traits of the NPC.", examples=["Gruff but kind-hearted, easily annoyed by time-wasters."])
+    context: str = Field(..., description="The immediate state of the NPC: their current location, time of day, weather, and current activity.", examples=["Working at the forge, late evening, raining outside."])
+    talkativeness: Talkativeness = Field(..., description="How much the NPC tends to talk.", examples=["Balanced"]) 
+    main_character_relation: str = Field(..., description="The NPC's current attitude, stance, and relationship status toward the protagonist.", examples=["Friendly and respectful"])
 
     recent_plot: Optional[str] = Field(
         None, 
-        description="Recent world events or narrative shifts that directly affect or interest this specific NPC."
+        description="Recent world events or narrative shifts that directly affect or interest this specific NPC.",
+        examples=["Iron shipments have been delayed due to bandit attacks on the roads."]
     )
     visual_description: Optional[str] = Field(
         None, 
-        description="Detailed physical appearance, clothing, equipment, and visible expressions of the NPC."
+        description="Detailed physical appearance, clothing, equipment, and visible expressions of the NPC.",
+        examples=["Covered in soot, muscular, wearing a thick leather apron and holding a heavy hammer."]
     )
     backstory: Optional[str] = Field(
         None, 
-        description="The history, past experiences, and core motivations of the NPC."
+        description="The history, past experiences, and core motivations of the NPC.",
+        examples=["Learned the trade from his father, deeply values hard work and honesty."]
     )
     language: Optional[List[str]] = Field(
         None,
-        description="List of languages the NPC can speak. If null, falls back to the system's default language configuration." # TODO: Set default language in game context from CONFIG
+        description="List of languages the NPC can speak. If null, falls back to the system's default language configuration.", # TODO: Set default language in game context from CONFIG
+        examples=[["Common", "Dwarven"]]
     )
