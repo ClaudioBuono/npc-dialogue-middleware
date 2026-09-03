@@ -1,6 +1,8 @@
 # config/settings.yaml
 default_language: "en"
 number_of_options: 3
+profanity_filter: true
+prompt_fairness_filter: true
 llm:
   default_temperature: 0.8
   default_max_tokens: 1500

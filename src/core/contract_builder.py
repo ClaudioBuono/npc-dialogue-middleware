@@ -59,41 +59,35 @@ class ContractBuilder:
         raise ValueError(f"Unsupported intent type: {type(npc_context.intent)}")
 
     def _build_system_prompt(self, game_context: GameContext) -> str:
-        """
-        Builds the common part of the system prompt, shared across all dialogue intents.
-        Establishes the model's role, the game world context, and general output rules.
+        """Builds the common part of the system prompt, shared across all dialogue intents.
+
+        Establishes the model's role, the game world context, and general output
+        rules.
         """
         world_context = WORLD_CONTEXT_PROMPT.format(
             environment=game_context.environment,
             epoch=game_context.epoch,
             world_state=game_context.world_state,
         )
-        
-        result = "\n".join(
-            [
-                ROLE_PROMPT,
-                world_context
-            ])
+
+        prompts = [
+            ROLE_PROMPT,
+            world_context,
+        ]
 
         if game_context.main_character_description:
-            main_character_context = MAIN_CHARACTER_PROMPT.format(main_character_description = game_context.main_character_description)
+            prompts.append(
+                MAIN_CHARACTER_PROMPT.format(
+                    main_character_description=game_context.main_character_description
+                )
+            )
 
-            result = "\n".join(
-                [
-                    result,
-                    main_character_context
-                ])
+        prompts.append(GENERAL_RULES_PROMPT)
 
-        result = "\n".join(
-            [
-                result,
-                GENERAL_RULES_PROMPT,
-                FAIRNESS_BASE_RULES_PROMPT
-            ])
-            
-            
-        
-        return result
+        if Settings().prompt_fairness_filter:
+            prompts.append(FAIRNESS_BASE_RULES_PROMPT)
+
+        return "\n\n".join(prompts)
 
     
     def _build_prompt_npc_context(self, npc_context: NPCContext, dialogue_history: List[Dict[str,str]]) -> str:
