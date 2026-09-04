@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 from core.orchestrator import Orchestrator
 from core.types.contexts import GameContext, NPCContext
-from core.types.dataclasses import ComposedDialogue, DialogueStreamRequest
+from api.schemas import ComposedDialogue, DialogueStreamRequest
 from api.errors import GLOBAL_ERROR_RESPONSES
 router = APIRouter(tags=["dialogue"])
 

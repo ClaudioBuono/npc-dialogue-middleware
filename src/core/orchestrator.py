@@ -1,5 +1,6 @@
 from typing import Any, Optional, Iterator
 import logging
+from api.schemas import ComposedDialogue
 from core.config.settings import Settings
 from core.contract_builder import ContractBuilder
 from core.dialogue_generator import DialogueGenerator
@@ -12,7 +13,6 @@ from core.routing.registry import ModelRegistry
 from core.routing.router import LLMRouter
 from core.logger import to_json_format
 from core.types.contexts import Dialogue, GameContext, NPCContext, Quest, Talkativeness
-from core.types.dataclasses import ComposedDialogue
 from tools import pre_processing
 
 logger = logging.getLogger(__name__)

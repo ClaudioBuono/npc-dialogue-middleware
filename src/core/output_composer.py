@@ -1,6 +1,6 @@
 import json
 from core.types.contexts import NPCContext
-from core.types.dataclasses import ComposedDialogue, DialogueOptionsSchema, QuestChoiceSchema
+from api.schemas import ComposedDialogue, DialogueOptionsSchema, QuestChoiceSchema
 from core.types.contexts import Quest
 
 class DialogueOutputComposer:

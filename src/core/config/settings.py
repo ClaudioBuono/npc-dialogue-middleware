@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from pathlib import Path
 from threading import Lock
 import yaml
+from blinker import Signal
 
 from core.types.enums import Language
 
@@ -40,6 +41,9 @@ class Settings:
     _lock: Lock = Lock()
     _settings: AppSettings | None = None
     _config_dir: Path | None = None
+
+    # Events
+    language_changed = Signal("language-changed")
 
     def __new__(cls):
         """Return the existing singleton instance, or create and load it
@@ -158,6 +162,7 @@ class Settings:
             cls()  # force loading with defaults
         cls._settings.language = language
         logger.info(f"Language changed to {language.index}")
+        cls.language_changed.send(cls, language=language)
 
     @classmethod
     def toggle_profanity_filter(cls, flag: bool) -> None:

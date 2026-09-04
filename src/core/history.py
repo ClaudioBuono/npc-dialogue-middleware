@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from core.types.dataclasses import ComposedDialogue
+from api.schemas import ComposedDialogue
 
 
 class DialogueHistory:

@@ -80,7 +80,6 @@ DIALOGUE_HISTORY_PROMPT = inspect.cleandoc("""
 """)
 
 DIALOGUE_RULES_PROMPT = inspect.cleandoc("""
-
     TASK RULES:
 """)
 
@@ -92,6 +91,11 @@ GENERAL_RULES_PROMPT = inspect.cleandoc("""
     - Write dialogue in a natural, spoken style appropriate to the NPC's personality and the epoch.
     - Do not break the fourth wall or reference being an AI.
     - Respond ONLY with a valid JSON object matching the schema provided by the user, with no additional text, explanation, or markdown formatting.
+""")
+
+LANGUAGE_RULE_PROMPT = inspect.cleandoc("""
+    OUTPUT LANGUAGE:
+    All text values in the JSON (dialogues, descriptions, options) MUST be written entirely in {language}.
 """)
 
 FAIRNESS_BASE_RULES_PROMPT = inspect.cleandoc("""

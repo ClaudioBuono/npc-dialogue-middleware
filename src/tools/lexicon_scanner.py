@@ -1,6 +1,5 @@
 import ahocorasick
 
-
 class FastLexiconScanner:
     """Efficient multi-pattern text scanner based on the Aho-Corasick algorithm."""
 
@@ -14,7 +13,7 @@ class FastLexiconScanner:
         for term in terms:
             self.automaton.add_word(term.lower(), term.lower())
         self.automaton.make_automaton()
-        self.max_len = max((len(t) for t in terms), default=0)
+        self.max_len = max((len(t) for t in terms), default=0) # TODO: Remove?????
 
     def scan(self, text: str) -> list[str]:
         """Scans input text for matches bounded by whole-word boundaries.
@@ -56,7 +55,7 @@ class FastLexiconScanner:
 class StreamingLexiconScanner:
     """Scan state for a single streaming."""
 
-    def __init__(self, lexicon: 'FastLexiconScanner') -> None:
+    def __init__(self, lexicon: FastLexiconScanner) -> None:
         self._automaton = lexicon.automaton
         self._max_len = lexicon.max_len
         self._tail = ""
