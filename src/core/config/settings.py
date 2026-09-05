@@ -22,6 +22,7 @@ class AppSettings(BaseModel):
 
     language: Language = Language.ENGLISH
     llm: LLMSettings = Field(default_factory=LLMSettings)
+    profiling: bool = False
     profanity_filter: bool = True
     prompt_fairness_filter: bool = True
     number_of_options: int = 2

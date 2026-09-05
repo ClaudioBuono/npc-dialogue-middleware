@@ -24,6 +24,12 @@ class RoutingConfigErrorCode(Enum):
 
     MISSING_INTENDED_TIER = "missing_intended_tier"
 
+class MiddlewareErrorCode(Enum):
+    STARTING = "starting"
+    SETTING_CONTEXT = "setting_context"
+    GENERATING = "generating"
+
+
 # Error parsing ----------------------------------------------------------
 class PreProcessingError(Exception):
     """Raised when semantic validation of an incoming model fails.
@@ -57,6 +63,14 @@ class RoutingConfigError(Exception):
     a model is missing its declared tier)."""
 
     def __init__(self, code: RoutingConfigErrorCode, errors: list[str]):
+        self.code = code
+        self.errors = errors
+        super().__init__(f"[{code.value}] " + "; ".join(errors))
+
+class MiddlewareError(Exception):
+    
+
+    def __init__(self, code: MiddlewareErrorCode, errors: list[str]):
         self.code = code
         self.errors = errors
         super().__init__(f"[{code.value}] " + "; ".join(errors))

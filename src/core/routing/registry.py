@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional
-from core.routing.models import ModelConfig
+from core.config.settings import Settings
+from core.routing.models import ModelConfig, load_config_from_file
 from core.routing.profiler import BaseProfiler, SelfAssessmentProfiler, BenchmarkProfiler, RankedModel, build_client, _TIER_TO_SCORE
 from core.types.enums import ComplexityTier
 from tools.errors import RoutingConfigError, RoutingConfigErrorCode
@@ -17,14 +18,20 @@ class ModelRegistry:
     """
 
     _instance: Optional["ModelRegistry"] = None
+    _ranked_models: List[RankedModel]
+    _models_configs: List[ModelConfig]
 
     def __new__(cls) -> "ModelRegistry":
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._ranked_models = []
+            instance = super().__new__(cls)
+            instance._ranked_models = []
+            instance._models_configs = load_config_from_file(
+                Settings()._config_dir / "modelconfigs.json"
+            )
+            cls._instance = instance
         return cls._instance
 
-    def set_models(self, models: List[ModelConfig], profiler: bool = True) -> None:
+    def set_models(self, profiler: bool = True) -> None:
         """Profiles and registers a new set of models, replacing any previous ones.
 
         Args:
@@ -41,15 +48,15 @@ class ModelRegistry:
                 signal to rely on, so this is treated as a misconfiguration
                 rather than silently defaulting to a guessed tier.
         """
-        if len(models) == 1:
-            self._ranked_models = [self._register_without_profiling(models[0])]
+        if len(self._models_configs) == 1:
+            self._ranked_models = [self._register_without_profiling(self._models_configs[0])]
             return
 
         if not profiler:
-            self._validate_tiers_declared(models)
+            self._validate_tiers_declared(self._models_configs)
 
         strategy: BaseProfiler = BenchmarkProfiler() if profiler else SelfAssessmentProfiler()
-        ranked = strategy.profile(models)
+        ranked = strategy.profile(self._models_configs)
         self._ranked_models = sorted(ranked, key=lambda r: r.score, reverse=True)
         self._print_ranked_models()
 

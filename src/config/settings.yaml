@@ -1,6 +1,7 @@
 # config/settings.yaml
 default_language: "en"
 number_of_options: 3
+profiling: false
 profanity_filter: true
 prompt_fairness_filter: true
 llm:

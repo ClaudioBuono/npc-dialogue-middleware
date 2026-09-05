@@ -20,6 +20,10 @@ GLOBAL_ERROR_RESPONSES = {
         "model": ErrorMessageResponse,
         "description": "Unauthorized - Authentication error with the LLM provider.",
     },
+    409: {
+        "model": ErrorValidationResponse,
+        "description": "Conflict - Middleware is busy generating a response and cannot process the request.",
+    },
     422: {
         "model": ErrorValidationResponse,
         "description": "Unprocessable Entity - Semantic validation errors on the incoming payload.",
@@ -35,6 +39,10 @@ GLOBAL_ERROR_RESPONSES = {
     502: {
         "model": ErrorMessageResponse,
         "description": "Bad Gateway - Connection error or empty response from the LLM provider.",
+    },
+    503: {
+        "model": ErrorValidationResponse,
+        "description": "Service Unavailable - Middleware is starting up or setting context, not ready to serve requests.",
     },
     504: {
         "model": ErrorMessageResponse,

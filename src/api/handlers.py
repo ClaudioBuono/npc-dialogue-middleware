@@ -5,6 +5,8 @@ from tools.errors import (
     LLMClientError,
     LLMClientErrorCode,
     RoutingConfigError,
+    MiddlewareError,
+    MiddlewareErrorCode,
 )
 
 
@@ -18,6 +20,16 @@ _LLM_ERROR_STATUS_MAP: dict[LLMClientErrorCode, int] = {
     LLMClientErrorCode.TIMEOUT_ERROR: status.HTTP_504_GATEWAY_TIMEOUT,
     LLMClientErrorCode.EMPTY_RESPONSE: status.HTTP_502_BAD_GATEWAY,
     LLMClientErrorCode.UNKNOWN_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
+}
+
+
+# --------------------------------------------------------------------------- #
+# Error code -> HTTP status mapping for MiddlewareError
+# --------------------------------------------------------------------------- #
+_MIDDLEWARE_ERROR_STATUS_MAP: dict[MiddlewareErrorCode, int] = {
+    MiddlewareErrorCode.STARTING: status.HTTP_503_SERVICE_UNAVAILABLE,
+    MiddlewareErrorCode.SETTING_CONTEXT: status.HTTP_503_SERVICE_UNAVAILABLE,
+    MiddlewareErrorCode.GENERATING: status.HTTP_409_CONFLICT,
 }
 
 
@@ -63,6 +75,21 @@ async def routing_config_error_handler(request: Request, exc: RoutingConfigError
     )
 
 
+async def middleware_error_handler(request: Request, exc: MiddlewareError) -> JSONResponse:
+    """Status code varies depending on the type of middleware failure."""
+
+    http_status = _MIDDLEWARE_ERROR_STATUS_MAP.get(
+        exc.code, status.HTTP_500_INTERNAL_SERVER_ERROR
+    )
+    return JSONResponse(
+        status_code=http_status,
+        content={
+            "error_code": exc.code.value,
+            "errors": exc.errors,
+        },
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Centralized registration
 # --------------------------------------------------------------------------- #
@@ -70,3 +97,5 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(PreProcessingError, preprocessing_error_handler)
     app.add_exception_handler(LLMClientError, llm_client_error_handler)
     app.add_exception_handler(RoutingConfigError, routing_config_error_handler)
+    app.add_exception_handler(MiddlewareError, middleware_error_handler)
+    

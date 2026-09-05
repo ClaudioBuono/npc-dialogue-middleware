@@ -5,6 +5,8 @@ from fastapi import FastAPI
 import uvicorn
 from api import generate, settings
 from api.handlers import register_exception_handlers
+
+from core.StateManager import StateManager
 from core.logger import setup_logging, to_json_format
 from core.config.settings import Settings
 from core.orchestrator import Orchestrator
@@ -12,6 +14,7 @@ from core.paths import get_base_path
 from core.routing.registry import ModelRegistry
 from core.telemetry import TelemetryStore
 from core.types.contexts import *
+from core.types.enums import MiddlewareState
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +22,9 @@ DEFAULT_PORT = 8321
 
 def _setup_telemetry_store():
     """Sets-up the telemetry store path with all necessary information."""
+
     registry = ModelRegistry()  
-    model_ids = [m.identifier for m in registry.get_ranked_models()]  
+    model_ids = [m.config.id for m in registry.get_ranked_models()]  
 
     telemetry_path = get_base_path() / "logs" / "telemetry_snapshot.json"
     TelemetryStore.instance().configure_persistence(telemetry_path)
@@ -74,7 +78,6 @@ def run_debug():
         "language": ["Goblinoid"],
     }
 
-    # Conversione diretta del dict in un'istanza validata di NPCContext
     npc_context_1 = NPCContext.model_validate(npc_context_1_data)
 
     result = orchestrator.generate_dialogue(
@@ -105,13 +108,15 @@ def main():
         --port-file: Optional path to a file where the chosen port is
             written as JSON (e.g. for the game client to read on startup).
         --debug: Executes debug code instead of starting the application.
-    """
+    """    
     parser = argparse.ArgumentParser()
     parser.add_argument("--config-dir", default=None)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--port-file", default=None)
     parser.add_argument("--debug", action="store_true", help="Executes debug code instead of starting the application")
     args = parser.parse_args()
+
+    StateManager(initial_state = MiddlewareState.STARTING)
 
     config_dir = Path(args.config_dir) if args.config_dir else get_base_path() / "config"
     Settings.configure(config_dir)
@@ -120,6 +125,13 @@ def main():
     setup_logging(logging.DEBUG)
     logger = logging.getLogger(__name__)
     logger.info("Starting middleware")
+
+
+
+    # Instantiate Orchestrator singleton
+    Orchestrator()
+    
+    ModelRegistry().set_models(profiler = Settings().profiling)
 
     _setup_telemetry_store()
 
@@ -132,6 +144,10 @@ def main():
 
     if args.port_file:
         Path(args.port_file).write_text(f'{{"port": {port}}}')
+
+
+ 
+    StateManager().transition_to(MiddlewareState.IDLE)
 
     uvicorn.run(
         app,
