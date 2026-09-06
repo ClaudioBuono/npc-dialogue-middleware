@@ -1,13 +1,74 @@
 from fastapi import APIRouter
-from api.schemas import LanguageRequest
-from core.config.settings import Settings
+from core.config.settings import Settings, AppSettings, LLMSettings
+from api.schemas import LanguageRequest, ToggleRequest, NumberOfOptionsRequest, SettingsUpdatedResponse
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
-@router.post("/language") 
-def change_language(language: LanguageRequest):
-	Settings().change_language(language.language)
+@router.get(
+    "",
+    response_model=AppSettings,
+    summary="Get Current Settings",
+    description="Returns the currently loaded application settings.",
+    responses={200: {"description": "Current settings retrieved successfully."}},
+)
+def get_settings():
+    return Settings.get_current()
 
-@router.post("/profanity-filter")
-def toggle_profanity_filter(toggle: bool):
-	Settings().toggle_profanity_filter(toggle)
+
+@router.post(
+    "/language",
+    response_model=SettingsUpdatedResponse,
+    summary="Change Language",
+    description="Updates the active application language.",
+    responses={200: {"description": "Language updated successfully."}},
+)
+def change_language(request: LanguageRequest):
+    Settings().change_language(request.language)
+    return {"status": "ok"}
+
+
+@router.post(
+    "/profanity-filter",
+    response_model=SettingsUpdatedResponse,
+    summary="Toggle Profanity Filter",
+    description="Enables or disables the profanity filter applied to generated dialogue.",
+    responses={200: {"description": "Profanity filter updated successfully."}},
+)
+def toggle_profanity_filter(request: ToggleRequest):
+    Settings().toggle_profanity_filter(request.enabled)
+    return {"status": "ok"}
+
+
+@router.post(
+    "/prompt-fairness-filter",
+    response_model=SettingsUpdatedResponse,
+    summary="Toggle Prompt Fairness Filter",
+    description="Enables or disables the prompt fairness filter applied to incoming prompts.",
+    responses={200: {"description": "Prompt fairness filter updated successfully."}},
+)
+def toggle_prompt_fairness_filter(request: ToggleRequest):
+    Settings().toggle_prompt_fairness_filter(request.enabled)
+    return {"status": "ok"}
+
+@router.post(
+    "/number-of-options",
+    response_model=SettingsUpdatedResponse,
+    summary="Set Number of Dialogue Options",
+    description="Sets how many player response options are generated per dialogue turn.",
+    responses={200: {"description": "Number of options updated successfully."}},
+)
+def set_number_of_options(request: NumberOfOptionsRequest):
+    Settings().set_number_of_options(request.value)
+    return {"status": "ok"}
+
+
+@router.post(
+    "/llm",
+    response_model=SettingsUpdatedResponse,
+    summary="Update LLM Settings",
+    description="Updates the default temperature and max tokens used for dialogue generation.",
+    responses={200: {"description": "LLM settings updated successfully."}},
+)
+def update_llm_settings(request: LLMSettings):
+    Settings().update_llm_settings(request)
+    return {"status": "ok"}

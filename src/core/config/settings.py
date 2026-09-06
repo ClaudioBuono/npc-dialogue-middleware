@@ -176,3 +176,53 @@ class Settings:
             cls()  # force loading with defaults
         cls._settings.profanity_filter = flag
         logger.info(f"Profanity filter {'ON' if flag else 'OFF'}")
+
+    @classmethod
+    def toggle_prompt_fairness_filter(cls, flag: bool) -> None:
+        """Enable or disable the prompt fairness filter, loading defaults first if needed.
+
+        Args:
+            flag: True to enable the prompt fairness filter, False to disable it.
+        """
+        if cls._settings is None:
+            cls()  # force loading with defaults
+        cls._settings.prompt_fairness_filter = flag
+        logger.info(f"Prompt fairness filter {'ON' if flag else 'OFF'}")
+
+    @classmethod
+    def set_number_of_options(cls, value: int) -> None:
+        """Set the number of dialogue options generated per turn, loading defaults first if needed.
+
+        Args:
+            value: Number of player response options to generate.
+        """
+        if cls._settings is None:
+            cls()  # force loading with defaults
+        cls._settings.number_of_options = value
+        logger.info(f"Number of options set to {value}")
+
+    @classmethod
+    def update_llm_settings(cls, llm_settings: LLMSettings) -> None:
+        """Replace the LLM settings (temperature, max tokens), loading defaults first if needed.
+
+        Args:
+            llm_settings: The new LLM settings to apply.
+        """
+        if cls._settings is None:
+            cls()  # force loading with defaults
+        cls._settings.llm = llm_settings
+        logger.info(
+            f"LLM settings updated: temperature={llm_settings.default_temperature}, "
+            f"max_tokens={llm_settings.default_max_tokens}"
+        )
+
+    @classmethod
+    def get_current(cls) -> AppSettings:
+        """Return the currently loaded settings, loading defaults first if needed.
+
+        Returns:
+            AppSettings: The current validated application settings.
+        """
+        if cls._settings is None:
+            cls()  # force loading with defaults
+        return cls._settings

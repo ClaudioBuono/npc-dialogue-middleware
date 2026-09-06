@@ -76,3 +76,20 @@ class MiddlewareStatusResponse(BaseModel):
 class LanguageRequest(BaseModel):
     """Payload for changing the language of the response."""
     language: Language
+
+from pydantic import BaseModel, Field
+
+
+class ToggleRequest(BaseModel):
+    """Generic request body for boolean feature toggles."""
+    enabled: bool = Field(..., description="True to enable the feature, false to disable it.")
+
+
+class NumberOfOptionsRequest(BaseModel):
+    """Request body for setting the number of dialogue options generated per turn."""
+    # At least 1 option must always be available
+    value: int = Field(..., ge=1, description="Number of player response options to generate.")
+
+class SettingsUpdatedResponse(BaseModel):
+    """Generic confirmation payload returned by settings-update endpoints."""
+    status: str = "ok"
