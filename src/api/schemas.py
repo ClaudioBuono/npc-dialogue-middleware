@@ -67,6 +67,12 @@ class DialogueStreamRequest(BaseModel):
         examples=["Accept the quest"]
     )
 
+class MiddlewareStatusResponse(BaseModel):
+    """Payload for getting middleware status"""
+    state: str
+    error_code: str | None = None
+    message: str | None = None
+
 class LanguageRequest(BaseModel):
     """Payload for changing the language of the response."""
     language: Language

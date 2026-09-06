@@ -1,11 +1,11 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse, StreamingResponse
-from api.handlers import _MIDDLEWARE_ERROR_STATUS_MAP
+from api.handlers import MIDDLEWARE_ERROR_STATUS_MAP
 from core.state_manager import StateManager
 from core.orchestrator import Orchestrator
 from core.types.contexts import GameContext, NPCContext
-from api.schemas import ComposedDialogue, DialogueStreamRequest
-from api.errors import GLOBAL_ERROR_RESPONSES
+from api.schemas import ComposedDialogue, DialogueStreamRequest, MiddlewareStatusResponse
+from api.errors import ALL_ERROR_RESPONSES, MIDDLEWARE_ERROR_RESPONSES, PREPROCESSING_ERROR_RESPONSES, ROUTING_CONFIG_ERROR_RESPONSES, error_responses
 from core.types.enums import MiddlewareState
 from tools.errors import MiddlewareError, MiddlewareErrorCode
 router = APIRouter(tags=["dialogue"])
@@ -18,7 +18,11 @@ def health():
     "/status",
     summary="Middleware Status",
     description="Returns the current middleware state.",
-    responses={**GLOBAL_ERROR_RESPONSES, 200: {"description": "Middleware is idling."}}
+    responses={
+        200: {"model": MiddlewareStatusResponse, "description": "Middleware is idling."},
+        409: {"model": MiddlewareStatusResponse, "description": "Conflict - The middleware is busy generating a response."},
+        503: {"model": MiddlewareStatusResponse, "description": "Service Unavailable - The middleware is starting up or setting context."},
+    },
 )
 def middleware_status():
     state_manager = StateManager()
@@ -31,18 +35,19 @@ def middleware_status():
                 content={"state": current_state.value},
             )
         case MiddlewareState.STARTING:
-            error_code = MiddlewareState.STARTING
+            error_code = MiddlewareErrorCode.STARTING
             message = "The middleware is starting."
         case MiddlewareState.SETTING_CONTEXT:
-            error_code = MiddlewareState.SETTING_CONTEXT
+            error_code = MiddlewareErrorCode.SETTING_CONTEXT
             message = "The middleware is setting the game context."
         case MiddlewareState.GENERATING:
             error_code = MiddlewareErrorCode.GENERATING
             message = "The middleware is generating the dialogue."
         case _:
             error_code = None
+            message = f"Unknown middleware state: {current_state.value}"
 
-    http_status = _MIDDLEWARE_ERROR_STATUS_MAP.get(
+    http_status = MIDDLEWARE_ERROR_STATUS_MAP.get(
         error_code, status.HTTP_503_SERVICE_UNAVAILABLE
     )
 
@@ -51,7 +56,7 @@ def middleware_status():
         content={
             "state": current_state.value,
             "error_code": error_code.value if error_code else None,
-            "message": message
+            "message": message,
         },
     )
 
@@ -59,7 +64,10 @@ def middleware_status():
 	"/set-game-context",
 	summary="Set Global Game Context",
 	description="Sets the global game world context including environment, epoch, and world state. This should be called when the player enters a new zone or a major world event occurs.",
-	responses={**GLOBAL_ERROR_RESPONSES, 200: {"description": "Context set successfully."}}
+	responses={
+              **error_responses(ROUTING_CONFIG_ERROR_RESPONSES,PREPROCESSING_ERROR_RESPONSES, MIDDLEWARE_ERROR_RESPONSES), 
+              200: {"description": "Context set successfully."}
+              }
 )
 def set_game_context(game_context: GameContext):
 
@@ -80,57 +88,45 @@ def set_game_context(game_context: GameContext):
 	response_model=ComposedDialogue,
 	summary="Generate NPC Dialogue",
 	description="Generates dialogue and available player responses based on the provided NPC context and current intent.",
-	responses={**GLOBAL_ERROR_RESPONSES, 200: {"description": "Dialogue generated successfully."}}
+	responses={**ALL_ERROR_RESPONSES, 200: {"description": "Dialogue generated successfully."}}
 )
 def generate_dialogue(npc_context: NPCContext):
 
-	if Orchestrator().game_context is None:
-			raise HTTPException(
-				status_code=status.HTTP_409_CONFLICT,
-				detail="Game context is not set.",
-			)
+    if Orchestrator().game_context is None:
+        raise MiddlewareError(code=MiddlewareErrorCode.CONTEXT_NOT_SET, errors=["Game context is not set."])
        
-	if not StateManager().is_in(MiddlewareState.IDLE):
-		raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
-	  
-	dialogue: ComposedDialogue = Orchestrator().generate_dialogue(
-		npc_context.name,
-		npc_context.age,
-		npc_context.personality,
-		npc_context.context,
-		npc_context.talkativeness,
-		npc_context.main_character_relation,
-		npc_context.intent,
-		None
-	)
+    if not StateManager().is_in(MiddlewareState.IDLE):
+        raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
+        
+    dialogue: ComposedDialogue = Orchestrator().generate_dialogue(
+        npc_context.name,
+        npc_context.age,
+        npc_context.personality,
+        npc_context.context,
+        npc_context.talkativeness,
+        npc_context.main_character_relation,
+        npc_context.intent,
+        None
+    )
 
-	if dialogue is None:
-		raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Dialogue generation was refused or game context is not set.",
-        )
+    if dialogue is None:
+        raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["Dialogue generation was refused."])
 
-	return dialogue
+    return dialogue
 
 @router.post(
     "/start-dialogue-stream",
     response_class=StreamingResponse,
     summary="Starts NPC Dialogue using streaming mode",
     description="Streams the generated dialogue line by line to reduce perceived latency for the player, cleaning the dialogue history.",
-    responses={**GLOBAL_ERROR_RESPONSES, 200: {"description": "Stream of dialogue text."}},
+    responses={**ALL_ERROR_RESPONSES, 200: {"description": "Stream of dialogue text."}},
 )
 def start_dialogue_stream(npc_context: NPCContext):
     if Orchestrator().game_context is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Game context is not set.",
-        )
-
+        raise MiddlewareError(code=MiddlewareErrorCode.CONTEXT_NOT_SET, errors=["Game context is not set."])
+           
     if not StateManager().is_in(MiddlewareState.IDLE):
-        raise MiddlewareError(
-            code=MiddlewareErrorCode.GENERATING,
-            errors=["The middleware is busy generating."],
-        )
+        raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
 
     Orchestrator().dialogue_history.clear_dialogue_history()
 
@@ -154,28 +150,28 @@ def start_dialogue_stream(npc_context: NPCContext):
     summary="Continues the NPC Dialogue using streaming mode",
     description="Streams the generated dialogue line by line to reduce perceived latency for the player, without cleaning the dialogue history.",
     responses={
-        **GLOBAL_ERROR_RESPONSES,
+        **ALL_ERROR_RESPONSES,
         200: {"description": "Stream of dialogue text."},
     },
 )
 def continue_dialogue_stream(request: DialogueStreamRequest):
-	if Orchestrator().game_context is None:
-		raise HTTPException(
-			status_code=status.HTTP_409_CONFLICT,
-			detail="Game context is not set.",
-		)
+    if Orchestrator().game_context is None:
+        raise MiddlewareError(code=MiddlewareErrorCode.CONTEXT_NOT_SET, errors=["Game context is not set."])
+            
+    if not StateManager().is_in(MiddlewareState.IDLE):
+        raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
 
-	npc = request.npc_context
+    npc = request.npc_context
 
-	stream = Orchestrator().generate_dialogue_stream(
-		npc.name,
-		npc.age,
-		npc.personality,
-		npc.context,
-		npc.talkativeness,
-		npc.main_character_relation,
-		npc.intent,
-		request.last_player_choice,
+    stream = Orchestrator().generate_dialogue_stream(
+        npc.name,
+        npc.age,
+        npc.personality,
+        npc.context,
+        npc.talkativeness,
+        npc.main_character_relation,
+        npc.intent,
+        request.last_player_choice,
 	)
 
-	return StreamingResponse(stream, media_type="text/plain")
+    return StreamingResponse(stream, media_type="text/plain")

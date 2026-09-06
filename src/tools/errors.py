@@ -27,6 +27,8 @@ class RoutingConfigErrorCode(Enum):
 class MiddlewareErrorCode(Enum):
     STARTING = "starting"
     SETTING_CONTEXT = "setting_context"
+    CONTEXT_NOT_SET = "context_not_set"
+    REFUSED = "refused"
     GENERATING = "generating"
 
 

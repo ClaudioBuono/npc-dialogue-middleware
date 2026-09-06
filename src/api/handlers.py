@@ -13,7 +13,7 @@ from tools.errors import (
 # --------------------------------------------------------------------------- #
 # Error code -> HTTP status mapping for LLMClientError
 # --------------------------------------------------------------------------- #
-_LLM_ERROR_STATUS_MAP: dict[LLMClientErrorCode, int] = {
+LLM_ERROR_STATUS_MAP: dict[LLMClientErrorCode, int] = {
     LLMClientErrorCode.CONNECTION_ERROR: status.HTTP_502_BAD_GATEWAY,
     LLMClientErrorCode.AUTHENTICATION_ERROR: status.HTTP_401_UNAUTHORIZED,
     LLMClientErrorCode.RATE_LIMIT_ERROR: status.HTTP_429_TOO_MANY_REQUESTS,
@@ -26,9 +26,11 @@ _LLM_ERROR_STATUS_MAP: dict[LLMClientErrorCode, int] = {
 # --------------------------------------------------------------------------- #
 # Error code -> HTTP status mapping for MiddlewareError
 # --------------------------------------------------------------------------- #
-_MIDDLEWARE_ERROR_STATUS_MAP: dict[MiddlewareErrorCode, int] = {
+MIDDLEWARE_ERROR_STATUS_MAP: dict[MiddlewareErrorCode, int] = {
     MiddlewareErrorCode.STARTING: status.HTTP_503_SERVICE_UNAVAILABLE,
     MiddlewareErrorCode.SETTING_CONTEXT: status.HTTP_503_SERVICE_UNAVAILABLE,
+    MiddlewareErrorCode.CONTEXT_NOT_SET: status.HTTP_409_CONFLICT,
+    MiddlewareErrorCode.REFUSED: status.HTTP_403_FORBIDDEN,
     MiddlewareErrorCode.GENERATING: status.HTTP_409_CONFLICT,
 }
 
@@ -51,7 +53,7 @@ async def preprocessing_error_handler(request: Request, exc: PreProcessingError)
 async def llm_client_error_handler(request: Request, exc: LLMClientError) -> JSONResponse:
     """Status code varies depending on the type of LLM client failure."""
     
-    http_status = _LLM_ERROR_STATUS_MAP.get(
+    http_status = LLM_ERROR_STATUS_MAP.get(
         exc.code, status.HTTP_500_INTERNAL_SERVER_ERROR
     )
     return JSONResponse(
@@ -78,7 +80,7 @@ async def routing_config_error_handler(request: Request, exc: RoutingConfigError
 async def middleware_error_handler(request: Request, exc: MiddlewareError) -> JSONResponse:
     """Status code varies depending on the type of middleware failure."""
 
-    http_status = _MIDDLEWARE_ERROR_STATUS_MAP.get(
+    http_status = MIDDLEWARE_ERROR_STATUS_MAP.get(
         exc.code, status.HTTP_500_INTERNAL_SERVER_ERROR
     )
     return JSONResponse(
