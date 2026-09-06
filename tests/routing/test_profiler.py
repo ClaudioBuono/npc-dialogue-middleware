@@ -11,7 +11,7 @@ from core.routing.profiler import (
 )
 from core.types.enums import ComplexityTier
 from core.llm.openai_client import OpenAICompatibleClient
-from tools.errors import LLMClientError
+from core.tools.errors import LLMClientError
 
 
 # ------------------------------------------------------------------

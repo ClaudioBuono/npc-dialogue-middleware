@@ -7,7 +7,7 @@ from core.config.thresholds import CHARS_PER_TOKEN, HIGH_THRESHOLD, LOW_THRESHOL
 from core.routing.helpers import classify_score_to_complexity_tier
 from core.types.contexts import GameContext, NPCContext, Quest, Dialogue
 from core.types.enums import ComplexityTier
-from core.logger import to_json_format
+from core.helpers.logger import to_json_format
 
 logger = logging.getLogger(__name__)
 

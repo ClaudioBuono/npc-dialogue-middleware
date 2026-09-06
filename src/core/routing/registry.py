@@ -4,7 +4,7 @@ from core.config.settings import Settings
 from core.routing.models import ModelConfig, load_config_from_file
 from core.routing.profiler import BaseProfiler, SelfAssessmentProfiler, BenchmarkProfiler, RankedModel, build_client, _TIER_TO_SCORE
 from core.types.enums import ComplexityTier
-from tools.errors import RoutingConfigError, RoutingConfigErrorCode
+from core.tools.errors import RoutingConfigError, RoutingConfigErrorCode
 logger = logging.getLogger(__name__)
 
 

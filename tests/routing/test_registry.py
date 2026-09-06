@@ -4,7 +4,7 @@ from core.routing.models import ModelConfig
 from core.routing.registry import ModelRegistry
 from core.routing.profiler import RankedModel
 from core.types.enums import ComplexityTier
-from tools.errors import RoutingConfigError
+from core.tools.errors import RoutingConfigError
 
 @pytest.fixture(autouse=True)
 def clean_registry():

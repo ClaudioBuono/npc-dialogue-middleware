@@ -7,7 +7,7 @@ from core.types.contexts import GameContext, NPCContext
 from api.schemas import ComposedDialogue, DialogueStreamRequest, MiddlewareStatusResponse
 from api.errors import ALL_ERROR_RESPONSES, MIDDLEWARE_ERROR_RESPONSES, PREPROCESSING_ERROR_RESPONSES, ROUTING_CONFIG_ERROR_RESPONSES, error_responses
 from core.types.enums import MiddlewareState
-from tools.errors import MiddlewareError, MiddlewareErrorCode
+from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 router = APIRouter(tags=["dialogue"])
 
 @router.get("/health", summary="Health Check", description="Returns OK if the service is running.")

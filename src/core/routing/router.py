@@ -8,7 +8,7 @@ from core.routing.profiler import RankedModel
 from core.llm.llm_base_client import BaseLLMClient
 from core.types.contexts import GameContext, NPCContext
 from core.types.enums import ComplexityTier
-from tools.errors import LLMClientError, LLMClientErrorCode
+from core.tools.errors import LLMClientError, LLMClientErrorCode
 logger = logging.getLogger(__name__)
 
 

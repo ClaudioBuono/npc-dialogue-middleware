@@ -7,7 +7,7 @@ from core.routing.router import LLMRouter
 from core.routing.complexity_analyzer import ComplexityScore
 from core.types.enums import ComplexityTier
 from core.types.contexts import GameContext, NPCContext, Dialogue, Talkativeness
-from tools.errors import LLMClientError
+from core.tools.errors import LLMClientError
 
 @pytest.fixture(autouse=True)
 def clean_registry():

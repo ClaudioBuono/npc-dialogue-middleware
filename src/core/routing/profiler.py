@@ -9,7 +9,7 @@ from core.llm.llm_base_client import BaseLLMClient
 from core.llm.openai_client import OpenAICompatibleClient
 from core.types.dataclasses import Contract
 from core.types.enums import ComplexityTier
-from tools.errors import LLMClientError, LLMClientErrorCode
+from core.tools.errors import LLMClientError, LLMClientErrorCode
 
 # Placeholder score mapping used by self-assessment and as a fallback.
 _TIER_TO_SCORE = {

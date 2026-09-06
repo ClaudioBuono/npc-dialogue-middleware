@@ -3,9 +3,9 @@ from threading import Lock
 import time
 from core.config.settings import Settings
 from core.types.enums import Language
-from tools.lexicon_scanner import FastLexiconScanner, StreamingLexiconScanner
+from core.tools.lexicon_scanner import FastLexiconScanner, StreamingLexiconScanner
 from api.schemas import ComposedDialogue
-from tools.lexicon_scanner import StreamingLexiconScanner
+from core.tools.lexicon_scanner import StreamingLexiconScanner
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class Guardrail:
             KeyError: se non esiste un dataset HurtLex per la lingua richiesta.
         """
         import pandas as pd
-        from core.paths import resource_path
+        from core.helpers.paths import resource_path
 
         hurtlex_filename_by_language = {
             Language.ENGLISH: "hurtlex_EN.tsv",

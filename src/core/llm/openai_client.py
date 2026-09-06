@@ -3,7 +3,6 @@ import logging
 from typing import Iterator
 import httpx
 import pynvml
-from core.logger import to_json_format
 from openai import (
     OpenAI,
     APIConnectionError,
@@ -15,7 +14,7 @@ from openai import (
 from core.telemetry import TelemetryRecorder
 from core.types.dataclasses import Contract
 from core.llm.llm_base_client import BaseLLMClient
-from tools.errors import LLMClientError, LLMClientErrorCode
+from core.tools.errors import LLMClientError, LLMClientErrorCode
 logger = logging.getLogger(__name__)
 
 

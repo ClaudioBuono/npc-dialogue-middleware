@@ -5,7 +5,7 @@ import dataclasses
 from pathlib import Path
 from pydantic import BaseModel
 
-from core.paths import get_base_path
+from core.helpers.paths import get_base_path
 
 LOG_FILENAME = "npc_middleware.log"
 

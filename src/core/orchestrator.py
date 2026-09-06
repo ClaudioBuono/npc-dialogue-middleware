@@ -6,14 +6,14 @@ from core.config.settings import Settings
 from core.contract_builder import ContractBuilder
 from core.dialogue_generator import DialogueGenerator
 from core.guardrail import Guardrail
-from core.history import DialogueHistory
+from core.tools.history import DialogueHistory
 from core.llm.openai_client import OpenAICompatibleClient
-from core.output_composer import DialogueOutputComposer
+from core.tools.output_composer import DialogueOutputComposer
 from core.routing.router import LLMRouter
-from core.logger import to_json_format
+from core.helpers.logger import to_json_format
 from core.types.contexts import Dialogue, GameContext, NPCContext, Quest, Talkativeness
 from core.types.enums import MiddlewareState
-from tools import pre_processing
+from core.tools import pre_processing
 
 logger = logging.getLogger(__name__)
 

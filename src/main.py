@@ -7,10 +7,10 @@ from api import generate, settings
 from api.handlers import register_exception_handlers
 
 from core.state_manager import StateManager
-from core.logger import setup_logging, to_json_format
+from core.helpers.logger import setup_logging, to_json_format
 from core.config.settings import Settings
 from core.orchestrator import Orchestrator
-from core.paths import get_base_path
+from core.helpers.paths import get_base_path
 from core.routing.registry import ModelRegistry
 from core.telemetry import TelemetryStore
 from core.types.contexts import *

@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 from core.config.thresholds import *
 from core.types.contexts import GameContext, Dialogue, NPCContext, Quest
-from tools.errors import PreProcessingError, ValidationErrorCode
+from core.tools.errors import PreProcessingError, ValidationErrorCode
 
 logger = logging.getLogger(__name__)
 
