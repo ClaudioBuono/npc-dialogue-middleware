@@ -7,7 +7,7 @@ from core.tools.errors import PreProcessingError, ValidationErrorCode
 logger = logging.getLogger(__name__)
 
 
-def validate_game_context(context: GameContext) -> GameContext:
+def normalize_and_validate_game_context(context: GameContext) -> GameContext:
     """Validate and normalize a GameContext instance.
 
     Performs semantic validation (beyond what Pydantic already checks
@@ -73,7 +73,7 @@ def validate_game_context(context: GameContext) -> GameContext:
     )
 
 
-def validate_npc_context(context: NPCContext) -> NPCContext:
+def normalize_and_validate_npc_context(context: NPCContext) -> NPCContext:
     """Validate and normalize an NPCContext instance.
 
     Performs semantic validation beyond what Pydantic already checks at

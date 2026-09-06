@@ -43,9 +43,12 @@ DIALOGUE_BASE_PROMPT = inspect.cleandoc("""
 
 QUEST_BASE_PROMPT = inspect.cleandoc("""
     The NPC MUST use this conversation to offer and assign the specified Quest to the player.
-    
-    QUEST ASSIGNMENT MANDATE:
-    Only use the given informations in the quest description, objective and more infos:
+
+    QUEST TO ASSIGN (MANDATORY CONTENT):
+    This objective is a required fact, not optional flavor. The dialogue MUST explicitly
+    communicate it to the player, phrased in the NPC's own voice/style. Do not omit it,
+    generalize it away, or replace it with a vaguer version. Use only the informations below;
+    do not add extra quest details beyond what is given:
 """)
 
 QUEST_CHOICE_PROMPT = inspect.cleandoc("""
@@ -75,6 +78,7 @@ MAIN_CHARACTER_PROMPT = inspect.cleandoc("""
 """)
 
 DIALOGUE_HISTORY_PROMPT = inspect.cleandoc("""
+    DIALOGUE HISTORY:
     These are the main events of the current conversation between you and the main character:
     {dialogue_history}
 """)
@@ -85,8 +89,8 @@ DIALOGUE_RULES_PROMPT = inspect.cleandoc("""
 
 GENERAL_RULES_PROMPT = inspect.cleandoc("""
     GENERAL RULES:
-    - If the NPC requires to give a Quest to the main character, it must use the given quest.
-    - DO NOT make up any unexistent information and stick to the given informations only.
+    - If a Quest is provided, its objective is MANDATORY content: the NPC's dialogue must explicitly convey it, never omit or water it down.
+    - Do not invent factual information beyond what is explicitly given (see GROUNDING RULES for what counts as invented).
     - Stay consistent with the WORLD CONTEXT, the NPC's personality, and the overall tone of the setting.
     - Write dialogue in a natural, spoken style appropriate to the NPC's personality and the epoch.
     - Do not break the fourth wall or reference being an AI.
@@ -102,4 +106,23 @@ FAIRNESS_BASE_RULES_PROMPT = inspect.cleandoc("""
     FAIRNESS RULES:
     - Avoid stereotypes related to the NPC's gender, ethnicity, nationality, or social background.
     - Do not associate negative traits (criminality, ignorance, aggression) with specific groups in a gratuitous manner or without justification in the narrative context.
+""")
+
+GROUNDING_RULES_PROMPT = inspect.cleandoc("""
+    GROUNDING RULES:
+    - Treat all information given above (NPC fields, World Context, Quest details, Recent Events) as the complete and only known facts about this character and situation.
+    - You MAY freely invent minor stylistic and atmospheric details that do not add new facts: gestures, tone of voice, background sounds, physical actions, filler phrases consistent with the NPC's personality and dialect.
+    - You MUST NOT invent new factual content: no new names of people or places, no new past events, no new relationships, no new causes or motivations, no new quest details beyond what was explicitly provided.
+    - If the dialogue would naturally benefit from a specific detail that was not provided, keep the reference generic or vague rather than inventing specifics.
+    - Never contradict any of the given fields.
+    - This rule governs INVENTED content only. It does NOT permit omitting any mandatory content explicitly required elsewhere (e.g. the quest objective, required dialogue options). Grounding means not adding facts, never omitting required ones.
+""")
+
+FINAL_CHECK_PROMPT = inspect.cleandoc("""
+    FINAL CHECK BEFORE ANSWERING (verify silently, then output only the JSON):
+    1. If a quest was provided, does "dialogue" explicitly state its objective in full? It must.
+    2. Does "dialogue_options" contain exactly the required number of neutral items, with no accept/refuse hints?
+    3. If accept/refuse options were required, do they clearly reference the same objective?
+    4. Is every fact used present in the fields provided above, with no invented names, places, or events?
+    If any check fails, revise the content before producing the final output.
 """)

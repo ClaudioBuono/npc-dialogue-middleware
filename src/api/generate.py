@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from api.handlers import MIDDLEWARE_ERROR_STATUS_MAP
 from core.state_manager import StateManager
 from core.orchestrator import Orchestrator
+from core.tools import pre_processing
 from core.types.contexts import GameContext, NPCContext
 from api.schemas import ComposedDialogue, DialogueStreamRequest, MiddlewareStatusResponse
 from api.errors import ALL_ERROR_RESPONSES, MIDDLEWARE_ERROR_RESPONSES, PREPROCESSING_ERROR_RESPONSES, ROUTING_CONFIG_ERROR_RESPONSES, error_responses
@@ -71,17 +72,17 @@ def middleware_status():
 )
 def set_game_context(game_context: GameContext):
 
-	if not StateManager().is_in(MiddlewareState.IDLE):
-			raise MiddlewareError(code=MiddlewareErrorCode.SETTING_CONTEXT, errors=["The middleware is busy setting the game context."])
-      
-	Orchestrator().set_game_context(
-		game_context.environment,
-		game_context.epoch,
-		game_context.world_state,
-		game_context.main_character_description,
-	)
+    if not StateManager().is_in(MiddlewareState.IDLE):
+        raise MiddlewareError(code=MiddlewareErrorCode.SETTING_CONTEXT, errors=["The middleware is busy setting the game context."])
 
-	return {"status": "ok"}
+    if not Orchestrator().guardrail.validate_game_context(game_context):
+        raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the game context."])
+
+    game_context = pre_processing.normalize_and_validate_game_context(game_context)
+
+    Orchestrator().set_game_context(game_context)
+
+    return {"status": "ok"}
 
 @router.post(
 	"/generate-dialogue",
@@ -97,17 +98,13 @@ def generate_dialogue(npc_context: NPCContext):
        
     if not StateManager().is_in(MiddlewareState.IDLE):
         raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
-        
-    dialogue: ComposedDialogue = Orchestrator().generate_dialogue(
-        npc_context.name,
-        npc_context.age,
-        npc_context.personality,
-        npc_context.context,
-        npc_context.talkativeness,
-        npc_context.main_character_relation,
-        npc_context.intent,
-        None
-    )
+
+    if not Orchestrator().guardrail.validate_npc_context(npc_context):
+            raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the npc context."])
+    
+    npc_context = pre_processing.normalize_and_validate_npc_context(npc_context)
+    
+    dialogue: ComposedDialogue = Orchestrator().generate_dialogue(npc_context, None)
 
     if dialogue is None:
         raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["Dialogue generation was refused."])
@@ -124,22 +121,18 @@ def generate_dialogue(npc_context: NPCContext):
 def start_dialogue_stream(npc_context: NPCContext):
     if Orchestrator().game_context is None:
         raise MiddlewareError(code=MiddlewareErrorCode.CONTEXT_NOT_SET, errors=["Game context is not set."])
-           
+
     if not StateManager().is_in(MiddlewareState.IDLE):
         raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
 
+    if not Orchestrator().guardrail.validate_npc_context(npc_context):
+        raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the npc context."])
+
+    npc_context = pre_processing.normalize_and_validate_npc_context(npc_context)
+
     Orchestrator().dialogue_history.clear_dialogue_history()
 
-    stream = Orchestrator().generate_dialogue_stream(
-        npc_context.name,
-        npc_context.age,
-        npc_context.personality,
-        npc_context.context,
-        npc_context.talkativeness,
-        npc_context.main_character_relation,
-        npc_context.intent,
-        None,
-    )
+    stream = Orchestrator().generate_dialogue_stream(npc_context, None)
 
     return StreamingResponse(stream, media_type="text/plain")
 
@@ -157,21 +150,20 @@ def start_dialogue_stream(npc_context: NPCContext):
 def continue_dialogue_stream(request: DialogueStreamRequest):
     if Orchestrator().game_context is None:
         raise MiddlewareError(code=MiddlewareErrorCode.CONTEXT_NOT_SET, errors=["Game context is not set."])
-            
+
+    if Orchestrator().dialogue_history.is_empty():
+        raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["Dialogue history is empty."])
+
     if not StateManager().is_in(MiddlewareState.IDLE):
         raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
 
-    npc = request.npc_context
+    npc_context = request.npc_context
 
-    stream = Orchestrator().generate_dialogue_stream(
-        npc.name,
-        npc.age,
-        npc.personality,
-        npc.context,
-        npc.talkativeness,
-        npc.main_character_relation,
-        npc.intent,
-        request.last_player_choice,
-	)
+    if not Orchestrator().guardrail.validate_npc_context(npc_context):
+        raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the npc context."])
+
+    npc_context = pre_processing.normalize_and_validate_npc_context(npc_context)
+
+    stream = Orchestrator().generate_dialogue_stream(npc_context, request.last_player_choice)
 
     return StreamingResponse(stream, media_type="text/plain")

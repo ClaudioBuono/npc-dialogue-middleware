@@ -69,37 +69,21 @@ class Orchestrator:
 
     # Orchestrator Methods ----------------------------------------------------------------------------
 
-    def set_game_context(self, environment: str, epoch: str, world_state: str, main_character_description: str | None) -> None:
+    def set_game_context(self, game_context: GameContext) -> None:
         """Set the game context by validating environment, epoch, and lore."""
 
         StateManager().transition_to(MiddlewareState.SETTING_CONTEXT)
 
-        game_context = GameContext(
-            epoch=epoch,
-            environment=environment,
-            world_state=world_state,
-            main_character_description=main_character_description
-        )
-        self.game_context = pre_processing.validate_game_context(game_context)
+        self.game_context = game_context
 
         StateManager().transition_to(MiddlewareState.IDLE)
         
 
-    def generate_dialogue(
-        self,
-        name: str,
-        age: int,
-        personality: str,
-        context: str,
-        talkativeness: Talkativeness,
-        main_character_relation: str,
-        intent: Quest | Dialogue,
-        last_player_choice: Optional[str]
-    ) -> ComposedDialogue | None:
+    def generate_dialogue(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> ComposedDialogue | None:
         
         """Generate NPC dialogue using the NPC and game context."""
 
-        logger.info(f"Generating dialogue for NPC '{name}'")
+        logger.info(f"Generating dialogue for NPC '{npc_context.name}'")
             
         StateManager().transition_to(MiddlewareState.GENERATING)
 
@@ -109,29 +93,19 @@ class Orchestrator:
             self.dialogue_history.add_player_dialogue_to_history(last_player_choice)
             logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
 
-        
-        npc_context = NPCContext(
-            name=name,
-            age=age,
-            personality=personality,
-            context=context,
-            talkativeness=talkativeness,
-            main_character_relation=main_character_relation,
-            intent=intent,
-        )
-        validated_npc_context = pre_processing.validate_npc_context(npc_context)
-        contract = self.contract_builder.build(self.game_context, validated_npc_context, self.dialogue_history.get_dialogue_history())
 
-        client: OpenAICompatibleClient = self.llm_router.select_model(game_context = self.game_context, npc_context = validated_npc_context)
+        contract = self.contract_builder.build(self.game_context, npc_context, self.dialogue_history.get_dialogue_history())
+
+        client: OpenAICompatibleClient = self.llm_router.select_model(game_context = self.game_context, npc_context = npc_context)
         logger.debug(f"Selected LLM client: {type(client).__name__}")
 
         self.dialogue_generator.set_client(client)
         raw_dialogue: str = self.dialogue_generator.generate(contract)
 
-        composed_dialogue = self.dialogue_composer.compose_dialogue(validated_npc_context, raw_dialogue)
+        composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, raw_dialogue)
 
         if Settings().profanity_filter:
-            valid_output: bool = self.guardrail.validate(composed_dialogue)
+            valid_output: bool = self.guardrail.validate_composed_output(composed_dialogue)
 
             if not valid_output:
                 logger.info(f"Dialogue refused for fairness violation.")
@@ -149,22 +123,12 @@ class Orchestrator:
         return composed_dialogue
 
 
-    def generate_dialogue_stream(
-        self,
-        name: str,
-        age: int,
-        personality: str,
-        context: str,
-        talkativeness: Talkativeness,
-        main_character_relation: str,
-        intent: Quest | Dialogue,
-        last_player_choice: Optional[str]
-    ) -> Iterator[str]:
+    def generate_dialogue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
         
         """Generate NPC dialogue using the NPC and game context via streaming."""
 
         StateManager().transition_to(MiddlewareState.GENERATING)
-        logger.info(f"Generating dialogue stream for NPC '{name}'")
+        logger.info(f"Generating dialogue stream for NPC '{npc_context.name}'")
 
         self._iterations += 1
 
@@ -172,19 +136,9 @@ class Orchestrator:
             self.dialogue_history.add_player_dialogue_to_history(last_player_choice)
             logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
         
-        npc_context = NPCContext(
-            name=name,
-            age=age,
-            personality=personality,
-            context=context,
-            talkativeness=talkativeness,
-            main_character_relation=main_character_relation,
-            intent=intent,
-        )
-        validated_npc_context = pre_processing.validate_npc_context(npc_context)
-        contract = self.contract_builder.build(self.game_context, validated_npc_context, self.dialogue_history.get_dialogue_history())
+        contract = self.contract_builder.build(self.game_context, npc_context, self.dialogue_history.get_dialogue_history())
 
-        client: OpenAICompatibleClient = self.llm_router.select_model(game_context = self.game_context, npc_context = validated_npc_context)
+        client: OpenAICompatibleClient = self.llm_router.select_model(game_context = self.game_context, npc_context = npc_context)
         logger.debug(f"Selected LLM client: {type(client).__name__}")
 
         self.dialogue_generator.set_client(client)
@@ -219,7 +173,7 @@ class Orchestrator:
 
         if not refused:
             try:
-                composed_dialogue = self.dialogue_composer.compose_dialogue(validated_npc_context, full_dialogue)
+                composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, full_dialogue)
                 self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
 
                 StateManager().transition_to(MiddlewareState.IDLE)

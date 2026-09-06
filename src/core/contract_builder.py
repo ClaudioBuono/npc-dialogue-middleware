@@ -176,6 +176,8 @@ class ContractBuilder:
             rules_section = self._build_rules(npc_context.intent)
             result = "\n".join([result, rules_section])
 
+        result = "\n".join([result, GROUNDING_RULES_PROMPT])
+
         return result
 
     # Merges the NPC context prompt and base Dialogue prompt for building
