@@ -42,3 +42,6 @@ class DialogueHistory:
     def clear_dialogue_history(self) -> None:
         """Remove all entries from the dialogue history."""
         self.history.clear()
+
+    def is_empty(self) -> bool:
+        return len(self.history) == 0

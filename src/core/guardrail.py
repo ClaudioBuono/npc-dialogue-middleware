@@ -2,6 +2,7 @@ import logging
 from threading import Lock
 import time
 from core.config.settings import Settings
+from core.types.contexts import GameContext, NPCContext
 from core.types.enums import Language
 from core.tools.lexicon_scanner import FastLexiconScanner, StreamingLexiconScanner
 from api.schemas import ComposedDialogue
@@ -32,7 +33,33 @@ class Guardrail:
             self.lexicon_scanner = FastLexiconScanner(terms)
         logger.info(f"Lexicon rebuilt for language {language}")
 
-    def validate(self, composed_output: ComposedDialogue) -> bool:
+    def _validate_text(self, text_to_validate: str) -> bool:
+        # Scan for banned words
+        start_time = time.perf_counter()
+        with self._scanner_lock:
+            scanner = self.lexicon_scanner
+        scan_result: list[str] = scanner.scan(text_to_validate)
+        execution_time_ms = (time.perf_counter() - start_time) * 1000
+        logger.debug(f"Output scanned in {execution_time_ms}ms.")
+        logger.info(f"Fairness scan '{scan_result}'")
+
+        return len(scan_result) == 0
+
+    def validate_npc_context(self, npc_context: NPCContext) -> bool:
+        data = npc_context.model_dump(exclude_none=True)
+        text = " ".join(f"{key}: {value}" for key, value in data.items())
+
+        return self._validate_text(text)
+
+
+    def validate_game_context(self, game_context: GameContext) -> bool:
+        data = game_context.model_dump(exclude_none=True)
+        text = " ".join(f"{key}: {value}" for key, value in data.items())
+
+        return self._validate_text(text)
+
+
+    def validate_composed_output(self, composed_output: ComposedDialogue) -> bool:
         """Scans the fields of a ComposedDialogue instance for lexicon violations.
 
         Args:
@@ -52,17 +79,9 @@ class Guardrail:
 
         # Combine all valid string fields into a single text payload for scanning
         raw_Text = " ".join(val for val in fields if isinstance(val, str))
+        
 
-        # Scan for banned words
-        start_time = time.perf_counter()
-        with self._scanner_lock:
-            scanner = self.lexicon_scanner
-        scan_result: list[str] = scanner.scan(raw_Text)
-        execution_time_ms = (time.perf_counter() - start_time) * 1000
-        logger.debug(f"Output scanned in {execution_time_ms}ms.")
-        logger.info(f"Fairness scan '{scan_result}'")
-
-        return len(scan_result) == 0
+        return self._validate_text(raw_Text)
 
     def get_streaming_scanner(self) -> StreamingLexiconScanner:
         """Returns a new StreamingLexiconScanner bound to the current lexicon."""
