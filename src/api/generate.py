@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from api.handlers import _MIDDLEWARE_ERROR_STATUS_MAP
-from core.StateManager import StateManager
+from core.state_manager import StateManager
 from core.orchestrator import Orchestrator
 from core.types.contexts import GameContext, NPCContext
 from api.schemas import ComposedDialogue, DialogueStreamRequest

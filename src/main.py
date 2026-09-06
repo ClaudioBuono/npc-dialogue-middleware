@@ -6,7 +6,7 @@ import uvicorn
 from api import generate, settings
 from api.handlers import register_exception_handlers
 
-from core.StateManager import StateManager
+from core.state_manager import StateManager
 from core.logger import setup_logging, to_json_format
 from core.config.settings import Settings
 from core.orchestrator import Orchestrator

@@ -72,6 +72,7 @@ class ContractBuilder:
 
         prompts = [
             ROLE_PROMPT,
+            LANGUAGE_RULE_PROMPT.format(language = Settings().language.name),
             world_context,
         ]
 

@@ -60,3 +60,15 @@ class StateManager:
                 # No actual change: exit without logging the transition
                 return
             self._state = new_state
+
+    def is_in(self, state: MiddlewareState) -> bool:
+        """
+        Check if the current state of the middleware matches the provided state.
+
+        Args:
+            state (MiddlewareState): The middleware state to compare against.
+
+        Returns:
+            bool: True if the current state equals the provided state, False otherwise.
+        """
+        return state == self.state

@@ -1,7 +1,7 @@
 from typing import Any, Optional, Iterator
 import logging
 from api.schemas import ComposedDialogue
-from core.StateManager import StateManager
+from core.state_manager import StateManager
 from core.config.settings import Settings
 from core.contract_builder import ContractBuilder
 from core.dialogue_generator import DialogueGenerator
