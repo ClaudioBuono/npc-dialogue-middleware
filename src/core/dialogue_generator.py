@@ -22,4 +22,4 @@ class DialogueGenerator:
         self._client = client
 
     def generate_stream(self, contract: Contract) -> Iterator[str]:
-        return self._client.generate_streaming(contract, temperature=0.3)
+        return self._client.generate_streaming(contract, temperature=Settings().llm.default_temperature)

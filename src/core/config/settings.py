@@ -14,7 +14,6 @@ class LLMSettings(BaseModel):
     """Configuration for the language model used to generate dialogue."""
 
     default_temperature: float = Field(0.7, ge=0.0, le=2.0)
-    default_max_tokens: int = Field(1000, gt=0)
 
 
 class AppSettings(BaseModel):
@@ -84,6 +83,8 @@ class Settings:
         with open(path, "r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
         settings = AppSettings(**raw)
+
+        print("SETT: ", settings)
 
         type(self)._settings = settings
 
@@ -213,7 +214,6 @@ class Settings:
         cls._settings.llm = llm_settings
         logger.info(
             f"LLM settings updated: temperature={llm_settings.default_temperature}, "
-            f"max_tokens={llm_settings.default_max_tokens}"
         )
 
     @classmethod

@@ -1,5 +1,6 @@
 from typing import Any, Dict
 from core.config.settings import Settings
+from core.helpers.formatters import format_dialogue_history
 from core.types.dataclasses import Contract
 from core.types.contexts import *
 from core.llm.prompts import *
@@ -126,7 +127,7 @@ class ContractBuilder:
         result = "\n".join(lines)
 
         if dialogue_history:
-            dialogue_history_prompt = DIALOGUE_HISTORY_PROMPT.format(dialogue_history = dialogue_history)
+            dialogue_history_prompt = DIALOGUE_HISTORY_PROMPT.format(dialogue_history = format_dialogue_history(dialogue_history, npc_context.name))
 
             result = "\n".join(
                 [

@@ -27,12 +27,12 @@ NPC_FIELDS_PROMPT = inspect.cleandoc("""
     - Very talkative: Verbose and rambling; prone to tangents and extra detail.
     
     NPC FIELDS:
-    - Name: {name},
-    - Age: {age},
-    - Personality: {personality},
-    - Context: {context},
-    - Talkativeness: {talkativeness},
-    - Main Character Relation: {main_character_relation},
+    - Name: {name}
+    - Age: {age}
+    - Personality: {personality}
+    - Context: {context}
+    - Talkativeness: {talkativeness}
+    - Main Character Relation: {main_character_relation}
 """)
 
 DIALOGUE_BASE_PROMPT = inspect.cleandoc("""
