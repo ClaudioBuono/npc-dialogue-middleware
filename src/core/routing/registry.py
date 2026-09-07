@@ -31,7 +31,7 @@ class ModelRegistry:
             cls._instance = instance
         return cls._instance
 
-    def set_models(self, profiler: bool = True) -> None:
+    def set_models(self, models: Optional[List[ModelConfig]], profiler: bool = True) -> None:
         """Profiles and registers a new set of models, replacing any previous ones.
 
         Args:
@@ -48,15 +48,24 @@ class ModelRegistry:
                 signal to rely on, so this is treated as a misconfiguration
                 rather than silently defaulting to a guessed tier.
         """
-        if len(self._models_configs) == 1:
-            self._ranked_models = [self._register_without_profiling(self._models_configs[0])]
+        configs_to_use = models if models is not None else self._models_configs
+
+        if not configs_to_use:
+            logger.warning("No model configurations available to register.")
+            self._ranked_models = []
+            return
+
+        self._models_configs = configs_to_use
+
+        if len(configs_to_use) == 1:
+            self._ranked_models = [self._register_without_profiling(configs_to_use[0])]
             return
 
         if not profiler:
-            self._validate_tiers_declared(self._models_configs)
+            self._validate_tiers_declared(configs_to_use)
 
         strategy: BaseProfiler = BenchmarkProfiler() if profiler else SelfAssessmentProfiler()
-        ranked = strategy.profile(self._models_configs)
+        ranked = strategy.profile(configs_to_use)
         self._ranked_models = sorted(ranked, key=lambda r: r.score, reverse=True)
         self._print_ranked_models()
 

@@ -284,7 +284,8 @@ class ComplexityAnalyzer:
         model_cls = type(model)
         total_weight = 0.0
         achieved = 0.0
-        for name in field_names:
+        fields_to_check = field_names - {"type"}
+        for name in fields_to_check:
             info = model_cls.model_fields[name]
             weight = self._flag_field_weight if self._is_bool_field(info.annotation) else 1.0
             total_weight += weight
@@ -335,7 +336,7 @@ class ComplexityAnalyzer:
         total_chars = (
             self._text_fields_length(game_context)
             + self._text_fields_length(npc_context, exclude={"intent", "language"})
-            + self._text_fields_length(npc_context.intent)
+            + self._text_fields_length(npc_context.intent, exclude={"type"})
         )
         estimated_tokens = total_chars / self._chars_per_token
 
