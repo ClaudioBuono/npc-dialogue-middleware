@@ -107,11 +107,11 @@ def test_text_fields_length():
         has_options=True                  # Boolean (should be bypassed in text length)
     )
     
-    # Total character length check: 9 + 14 = 23
-    assert analyzer._text_fields_length(dialogue) == 23
+    # Total character length check: 9 + 14 = 23 + type = "Dialogue" = 31
+    assert analyzer._text_fields_length(dialogue) == 31
 
-    # Total character length check with exclusion set
-    assert analyzer._text_fields_length(dialogue, exclude={"more_info"}) == 9
+    # Total character length check with exclusion set (excluding type, which is always done inside the actual evaluation)
+    assert analyzer._text_fields_length(dialogue, exclude={"type"}) == 23
 
 
 def test_own_optional_fields_robust():
