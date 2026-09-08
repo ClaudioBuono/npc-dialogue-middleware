@@ -69,10 +69,19 @@ class StreamingLexiconScanner:
         ]
 
     def feed(self, chunk: str) -> list[str]:
-        window = self._tail + chunk.lower()
+        chunk_lower = chunk.lower()
+        confirmed: list[str] = []
+
+        # Resolve last pending match
+        if self._pending:
+            term, _ = self._pending
+            self._pending = None
+            if not chunk_lower or not chunk_lower[0].isalnum():
+                confirmed.append(term)
+
+        window = self._tail + chunk_lower
         tail_len = len(self._tail)
         window_len = len(window)
-        confirmed: list[str] = []
 
         for start, end, term in self._raw_matches(window):
             if end < tail_len:

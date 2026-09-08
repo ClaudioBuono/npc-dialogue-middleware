@@ -117,12 +117,3 @@ GROUNDING_RULES_PROMPT = inspect.cleandoc("""
     - Never contradict any of the given fields.
     - This rule governs INVENTED content only. It does NOT permit omitting any mandatory content explicitly required elsewhere (e.g. the quest objective, required dialogue options). Grounding means not adding facts, never omitting required ones.
 """)
-
-FINAL_CHECK_PROMPT = inspect.cleandoc("""
-    FINAL CHECK BEFORE ANSWERING (verify silently, then output only the JSON):
-    1. If a quest was provided, does "dialogue" explicitly state its objective in full? It must.
-    2. Does "dialogue_options" contain exactly the required number of neutral items, with no accept/refuse hints?
-    3. If accept/refuse options were required, do they clearly reference the same objective?
-    4. Is every fact used present in the fields provided above, with no invented names, places, or events?
-    If any check fails, revise the content before producing the final output.
-""")
