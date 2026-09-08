@@ -1,3 +1,8 @@
+import dataclasses
+import json
+
+from pydantic import BaseModel
+
 def format_dialogue_history(history: list[dict[str, str]], npc_name: str) -> str:
     """Format the raw dialogue history into a human-readable block for the prompt.
 
@@ -28,3 +33,21 @@ def format_dialogue_history(history: list[dict[str, str]], npc_name: str) -> str
     
 
     return "\n".join(lines)
+
+def to_json_format(obj) -> str:
+    """Pretty-print an object (dict, dataclass, or Pydantic model) as a JSON string.
+
+    Args:
+        obj: The object to serialize. Can be a dict, list, dataclass,
+            Pydantic model, or any combination thereof.
+
+    Returns:
+        str: An indented (2-space) JSON string representation of ``obj``.
+    """
+    def custom_encoder(o):
+        if dataclasses.is_dataclass(o):
+            return dataclasses.asdict(o)
+        if isinstance(o, BaseModel):
+            return o.model_dump()
+        return str(o)
+    return json.dumps(obj, default=custom_encoder, indent=2, ensure_ascii=False)

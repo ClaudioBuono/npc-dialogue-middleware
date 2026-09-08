@@ -1,10 +1,12 @@
 from __future__ import annotations
 import json
+import math
 from pathlib import Path
 import time
 import logging
 import threading
 from dataclasses import dataclass, asdict, field
+from core.helpers.formatters import to_json_format
 
 telemetry_logger = logging.getLogger("telemetry")  # raw log, one line per request
 
@@ -99,7 +101,7 @@ class TelemetryStore:
         self._save_to_file()  # write the file immediately with the empty entries
 
     def record(self, sample: RequestTelemetry):
-        telemetry_logger.info(asdict(sample))
+        telemetry_logger.info(f"Updated telemetry info for {sample.model_identifier}:\n {to_json_format(sample)}")
 
         with self._lock:
             stats = self._stats.setdefault(
@@ -109,10 +111,22 @@ class TelemetryStore:
 
         self._save_to_file()  # <-- update the file after every request
 
+    @staticmethod
+    def _sanitize_floats(obj):
+        """Recursively replace non-finite floats (inf, -inf, nan) with None
+        so the result is always valid JSON."""
+        if isinstance(obj, dict):
+            return {k: TelemetryStore._sanitize_floats(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [TelemetryStore._sanitize_floats(v) for v in obj]
+        if isinstance(obj, float) and not math.isfinite(obj):
+            return None
+        return obj
+
     def snapshot(self) -> dict[str, dict]:
         """Returns an immutable copy of the current state, for reporting."""
         with self._lock:
-            return {name: asdict(s) for name, s in self._stats.items()}
+            return self._sanitize_floats({name: asdict(s) for name, s in self._stats.items()})
 
     def reset(self, model_identifier: str | None = None):
         with self._lock:

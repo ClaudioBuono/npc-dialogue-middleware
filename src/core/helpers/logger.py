@@ -53,22 +53,3 @@ def setup_logging(level=logging.INFO):
     file_handler = logging.FileHandler(telemetry_path, mode="a", encoding="utf-8")
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
-
-
-def to_json_format(obj) -> str:
-    """Pretty-print an object (dict, dataclass, or Pydantic model) as a JSON string.
-
-    Args:
-        obj: The object to serialize. Can be a dict, list, dataclass,
-            Pydantic model, or any combination thereof.
-
-    Returns:
-        str: An indented (2-space) JSON string representation of ``obj``.
-    """
-    def custom_encoder(o):
-        if dataclasses.is_dataclass(o):
-            return dataclasses.asdict(o)
-        if isinstance(o, BaseModel):
-            return o.model_dump()
-        return str(o)
-    return json.dumps(obj, default=custom_encoder, indent=2)

@@ -31,7 +31,7 @@ class ModelRegistry:
             cls._instance = instance
         return cls._instance
 
-    def set_models(self, models: Optional[List[ModelConfig]], profiler: bool = True) -> None:
+    def set_models(self, models: Optional[List[ModelConfig]] = None, profiler: bool = True) -> None:
         """Profiles and registers a new set of models, replacing any previous ones.
 
         Args:

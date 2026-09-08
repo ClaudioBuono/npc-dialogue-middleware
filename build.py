@@ -9,12 +9,11 @@ ROOT = Path(__file__).parent
 SRC_DIR = ROOT / "src"
 MAIN_SCRIPT = SRC_DIR / "main.py"
 CONFIG_SRC = SRC_DIR / "config"
+ASSETS_SRC = SRC_DIR / "assets"
 
 BUILD_DIR = ROOT / "build"
 SPEC_DIR = ROOT
 RAW_DIST_DIR = ROOT / "dist"
-
-HURTLEX_SOURCE = SRC_DIR / "tools" / "hurtlex_EN.tsv"
 
 
 def sep() -> str:
@@ -47,7 +46,7 @@ def run_pyinstaller():
         "--paths", str(SRC_DIR),
         "--add-data", f"{CONFIG_SRC / 'settings.yaml'}{sep()}config",
         "--add-data", f"{CONFIG_SRC / 'modelconfigs.json'}{sep()}config",
-        "--add-data", f"{HURTLEX_SOURCE}{sep()}.",  # destination "." = bundle root
+        "--add-data", f"{ASSETS_SRC}{sep()}.",  # destination "." = bundle root
         str(MAIN_SCRIPT),
     ], check=True, cwd=SRC_DIR)
 

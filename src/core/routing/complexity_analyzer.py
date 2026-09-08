@@ -4,10 +4,10 @@ from types import ModuleType
 from typing import get_args, get_origin, Union
 from pydantic import BaseModel
 from core.config.thresholds import CHARS_PER_TOKEN, HIGH_THRESHOLD, LOW_THRESHOLD
+from core.helpers.formatters import to_json_format
 from core.routing.helpers import classify_score_to_complexity_tier
 from core.types.contexts import GameContext, NPCContext, Quest, Dialogue
 from core.types.enums import ComplexityTier
-from core.helpers.logger import to_json_format
 
 logger = logging.getLogger(__name__)
 

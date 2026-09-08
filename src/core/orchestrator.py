@@ -11,10 +11,9 @@ from core.tools.history import DialogueHistory
 from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.output_composer import DialogueOutputComposer
 from core.routing.router import LLMRouter
-from core.helpers.logger import to_json_format
-from core.types.contexts import Dialogue, GameContext, NPCContext, Quest, Talkativeness
+from core.helpers.formatters import to_json_format
+from core.types.contexts import GameContext, NPCContext
 from core.types.enums import MiddlewareState
-from core.tools import pre_processing
 
 logger = logging.getLogger(__name__)
 

@@ -11,6 +11,7 @@ from openai import (
     APITimeoutError,
     APIStatusError,
 )
+from core.helpers.formatters import to_json_format
 from core.telemetry import TelemetryRecorder
 from core.types.dataclasses import Contract
 from core.llm.llm_base_client import BaseLLMClient
@@ -119,15 +120,37 @@ class OpenAICompatibleClient(BaseLLMClient):
             request = self._format_request(contract, temperature)
             logger.debug(f"Raw request: \n {request}")
             request["stream"] = True
+            request["stream_options"] = {"include_usage": True}
             if logger.isEnabledFor(logging.DEBUG):
                 self._log_human_readable_request(request)
 
+            recorder = TelemetryRecorder(self._model_identifier)
+            recorder.__enter__()  # sets self._start; must be called explicitly since `with` can't be used in a generator
+
+            chunks: list[str] = []
             try:
                 stream = self._client.chat.completions.create(**request, timeout=67.0)
                 for chunk in stream:
-                    delta = chunk.choices[0].delta.content
-                    if delta:
+                    if chunk.usage is not None:
+                        recorder.set_usage(chunk.usage.completion_tokens)
+
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        delta = chunk.choices[0].delta.content
+                        chunks.append(delta)
+                        recorder.record_chunk()
                         yield delta
+
+                content = "".join(chunks)
+
+                # Try formatting a json response, fallback to a regular string if it fails
+                try:
+                    formatted_content = json.dumps(json.loads(content), indent=2, ensure_ascii=False)
+                except Exception:
+                    formatted_content = content
+
+                logger.info(f"Generated response: \n {formatted_content}")
+                # logger.info(f"Generated response: \n {to_json_format(content)}")
+
             except AuthenticationError as e:
                 raise LLMClientError(code=LLMClientErrorCode.AUTHENTICATION_ERROR, message=f"Authentication failed for model '{self._model_identifier}': {e}") from e
             except RateLimitError as e:
@@ -138,6 +161,10 @@ class OpenAICompatibleClient(BaseLLMClient):
                 raise LLMClientError(code=LLMClientErrorCode.CONNECTION_ERROR, message=f"Could not connect to endpoint for model '{self._model_identifier}': {e}") from e
             except APIStatusError as e:
                 raise LLMClientError(code=LLMClientErrorCode.UNKNOWN_ERROR, message=f"Provider returned an error (status {e.status_code}) for model '{self._model_identifier}': {e}") from e
+            finally:
+                recorder.set_vram(*self._probe_vram())
+                recorder.__exit__(None, None, None)
+
 
     @property
     def model_name(self) -> str:
