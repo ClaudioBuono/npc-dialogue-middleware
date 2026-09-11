@@ -5,7 +5,7 @@ from threading import Lock
 import yaml
 from blinker import Signal
 
-from core.types.enums import Language
+from core.types.enums import Language, ProfanityMode
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,10 @@ class AppSettings(BaseModel):
     language: Language = Language.ENGLISH
     llm: LLMSettings = Field(default_factory=LLMSettings)
     profiling: bool = False
-    profanity_filter: bool = True
     prompt_fairness_filter: bool = True
     number_of_options: int = 2
+    profanity_mode: ProfanityMode = ProfanityMode.STOP
+    censor_word: str = "[CENSORED]" #TODO: change from api route
 
 
 class Settings:
@@ -167,18 +168,6 @@ class Settings:
         cls.language_changed.send(cls, language=language)
 
     @classmethod
-    def toggle_profanity_filter(cls, flag: bool) -> None:
-        """Enable or disable the profanity filter, loading defaults first if needed.
-
-        Args:
-            flag: True to enable the profanity filter, False to disable it.
-        """
-        if cls._settings is None:
-            cls()  # force loading with defaults
-        cls._settings.profanity_filter = flag
-        logger.info(f"Profanity filter {'ON' if flag else 'OFF'}")
-
-    @classmethod
     def toggle_prompt_fairness_filter(cls, flag: bool) -> None:
         """Enable or disable the prompt fairness filter, loading defaults first if needed.
 
@@ -213,7 +202,21 @@ class Settings:
             cls()  # force loading with defaults
         cls._settings.llm = llm_settings
         logger.info(
-            f"LLM settings updated: temperature={llm_settings.default_temperature}, "
+            f"LLM settings updated: temperature={llm_settings.default_temperature}"
+        )
+
+    @classmethod
+    def update_profanity_mode_settings(cls, profanity_mode: ProfanityMode) -> None:
+        """Replace the profanity mode, loading defaults first if needed.
+
+        Args:
+            profanity_mode: The new profanity mode setting to apply.
+        """
+        if cls._settings is None:
+            cls()  # force loading with defaults
+        cls._settings.profanity_mode = profanity_mode
+        logger.info(
+            f"Profanity mode setting updated: {profanity_mode.value}"
         )
 
     @classmethod

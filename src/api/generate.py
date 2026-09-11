@@ -1,13 +1,14 @@
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from api.handlers import MIDDLEWARE_ERROR_STATUS_MAP
+from core.config.settings import Settings
 from core.state_manager import StateManager
 from core.orchestrator import Orchestrator
 from core.tools import pre_processing
 from core.types.contexts import GameContext, NPCContext
 from api.schemas import ComposedDialogue, DialogueStreamRequest, MiddlewareStatusResponse
 from api.errors import ALL_ERROR_RESPONSES, MIDDLEWARE_ERROR_RESPONSES, PREPROCESSING_ERROR_RESPONSES, ROUTING_CONFIG_ERROR_RESPONSES, error_responses
-from core.types.enums import MiddlewareState
+from core.types.enums import MiddlewareState, ProfanityMode
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 router = APIRouter(tags=["dialogue"])
 
@@ -101,7 +102,7 @@ def generate_dialogue(npc_context: NPCContext):
 
     if not Orchestrator().guardrail.validate_npc_context(npc_context):
             raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the npc context."])
-    
+        
     npc_context = pre_processing.normalize_and_validate_npc_context(npc_context)
     
     dialogue: ComposedDialogue = Orchestrator().generate_dialogue(npc_context, None)
@@ -125,16 +126,23 @@ def start_dialogue_stream(npc_context: NPCContext):
     if not StateManager().is_in(MiddlewareState.IDLE):
         raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
 
+    headers = {}
+
+    if Settings().profanity_mode == ProfanityMode.STOP:
+        headers["X-Profanity-Mode-Warning"] = (
+            "STOP mode profanity filter cannot be used in streaming, continuing dialog in CENSOR mode."
+        )
+
     if not Orchestrator().guardrail.validate_npc_context(npc_context):
         raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the npc context."])
-
+    
     npc_context = pre_processing.normalize_and_validate_npc_context(npc_context)
 
     Orchestrator().dialogue_history.clear_dialogue_history()
 
     stream = Orchestrator().generate_dialogue_stream(npc_context, None)
 
-    return StreamingResponse(stream, media_type="text/plain")
+    return StreamingResponse(stream, media_type="text/plain", headers=headers)
 
 
 @router.post(
@@ -157,6 +165,13 @@ def continue_dialogue_stream(request: DialogueStreamRequest):
     if not StateManager().is_in(MiddlewareState.IDLE):
         raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
 
+    headers = {}
+    
+    if Settings().profanity_mode == ProfanityMode.STOP:
+        headers["X-Profanity-Mode-Warning"] = (
+            "STOP mode profanity filter cannot be used in streaming, continuing dialog in CENSOR mode."
+        )
+
     npc_context = request.npc_context
 
     if not Orchestrator().guardrail.validate_npc_context(npc_context):
@@ -166,4 +181,4 @@ def continue_dialogue_stream(request: DialogueStreamRequest):
 
     stream = Orchestrator().generate_dialogue_stream(npc_context, request.last_player_choice)
 
-    return StreamingResponse(stream, media_type="text/plain")
+    return StreamingResponse(stream, media_type="text/plain", headers=headers)

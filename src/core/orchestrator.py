@@ -1,4 +1,3 @@
-import re
 from typing import Any, Optional, Iterator
 import logging
 from api.schemas import ComposedDialogue
@@ -13,7 +12,7 @@ from core.tools.output_composer import DialogueOutputComposer
 from core.routing.router import LLMRouter
 from core.helpers.formatters import to_json_format
 from core.types.contexts import GameContext, NPCContext
-from core.types.enums import MiddlewareState
+from core.types.enums import MiddlewareState, ProfanityMode
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +103,7 @@ class Orchestrator:
 
         composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, raw_dialogue)
 
-        if Settings().profanity_filter:
+        if Settings().profanity_mode != ProfanityMode.DISABLED:
             valid_output: bool = self.guardrail.validate_composed_output(composed_dialogue)
 
             if not valid_output:
@@ -122,22 +121,12 @@ class Orchestrator:
 
         return composed_dialogue
 
-    @staticmethod
-    def _redact_terms(text: str, terms: list[str]) -> str:
-        """Changes banned words with [REDACTED]."""
-        #TODO: add custom changed token
-        for term in terms:
-            pattern = re.compile(rf'\b{re.escape(term)}\b', re.IGNORECASE)
-            text = pattern.sub("[REDACTED]", text)
-        return text
 
     def generate_dialogue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
         """Generate NPC dialogue using the NPC and game context via streaming."""
 
         StateManager().transition_to(MiddlewareState.GENERATING)
         logger.info(f"Generating dialogue stream for NPC '{npc_context.name}'")
-
-        self._iterations += 1
 
         if last_player_choice:
             self.dialogue_history.add_player_dialogue_to_history(last_player_choice)
@@ -153,14 +142,15 @@ class Orchestrator:
 
         scanner = None
         max_len = 0
-        if Settings().profanity_filter:
-            scanner = self.guardrail.get_streaming_scanner()
-            max_len = getattr(scanner, "_max_len", 0)
+       
+        scanner = self.guardrail.get_streaming_scanner()
+        max_len = getattr(scanner, "_max_len", 0)
 
         full_dialogue = ""
         refused = False
         output_buffer = ""
 
+        
         for chunk in stream:
             if not chunk:
                 continue
@@ -170,9 +160,9 @@ class Orchestrator:
                 output_buffer += chunk
 
                 if matches:
-                    logger.info(f"Chunk redacted for fairness violation. Matches: {matches}")
-                    output_buffer = self._redact_terms(output_buffer, matches)
-                    refused = True
+                        logger.info(f"Chunk redacted for fairness violation. Matches: {matches}")
+                        output_buffer = self.guardrail.redact_terms(output_buffer, matches)
+                        refused = True
 
                 safe_len = len(output_buffer) - max_len
                 if safe_len > 0:
@@ -184,18 +174,17 @@ class Orchestrator:
                 full_dialogue += chunk
                 yield chunk
 
-        
         if scanner:
             pending_matches = scanner.flush()
             if pending_matches:
-
                 logger.info(f"Dialogue stream redacted for fairness violation at end of stream. Matches: {pending_matches}")
-                output_buffer = self._redact_terms(output_buffer, pending_matches)
+                output_buffer = self.guardrail.redact_terms(output_buffer, pending_matches)
                 refused = True
 
             if output_buffer:
                 full_dialogue += output_buffer
                 yield output_buffer
+
 
         if not refused:
             try:
@@ -209,6 +198,7 @@ class Orchestrator:
             try:
                 composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, full_dialogue)
                 self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
+                StateManager().transition_to(MiddlewareState.IDLE)
             except Exception as e:
                 StateManager().transition_to(MiddlewareState.IDLE)
                 logger.error(f"Failed to compose dialogue after refused stream: {e}")

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from core.config.settings import Settings, AppSettings, LLMSettings
-from api.schemas import LanguageRequest, ToggleRequest, NumberOfOptionsRequest, SettingsUpdatedResponse
+from api.schemas import LanguageRequest, ProfanityModeRequest, ToggleRequest, NumberOfOptionsRequest, SettingsUpdatedResponse
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -25,19 +25,6 @@ def get_settings():
 def change_language(request: LanguageRequest):
     Settings().change_language(request.language)
     return {"status": "ok"}
-
-
-@router.post(
-    "/profanity-filter",
-    response_model=SettingsUpdatedResponse,
-    summary="Toggle Profanity Filter",
-    description="Enables or disables the profanity filter applied to generated dialogue.",
-    responses={200: {"description": "Profanity filter updated successfully."}},
-)
-def toggle_profanity_filter(request: ToggleRequest):
-    Settings().toggle_profanity_filter(request.enabled)
-    return {"status": "ok"}
-
 
 @router.post(
     "/prompt-fairness-filter",
@@ -71,4 +58,15 @@ def set_number_of_options(request: NumberOfOptionsRequest):
 )
 def update_llm_settings(request: LLMSettings):
     Settings().update_llm_settings(request)
+    return {"status": "ok"}
+
+@router.post(
+    "/profanity-mode",
+    response_model=SettingsUpdatedResponse,
+    summary="Update profanity mode",
+    description="Updates the default profanity mode used for dialogue generation.",
+    responses={200: {"description": "LLM settings updated successfully."}},
+)
+def update_profanity_mode_settings(request: ProfanityModeRequest):
+    Settings().update_profanity_mode_settings(request.profanity_mode)
     return {"status": "ok"}

@@ -1,4 +1,5 @@
 import logging
+import re
 from threading import Lock
 import time
 from core.config.settings import Settings
@@ -12,11 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class Guardrail:
-    """Provides validation mechanics to scan dialogue outputs.
-
-    Il lexicon interno viene ricostruito automaticamente ogni volta che
-    Settings.change_language() viene chiamato altrove nell'app.
-    """
+    """Provides validation mechanics to scan dialogue outputs."""
 
     def __init__(self) -> None:
         self._scanner_lock = Lock()
@@ -94,13 +91,13 @@ class Guardrail:
         """Loads and filters derogatory terms from the HurtLex dataset for a given language.
 
         Args:
-            language: la lingua per cui caricare il lessico.
+            language: the language for which to load the lexicon.
 
         Returns:
             set[str]: A set of unique lemma strings marked as conservative derogatory terms.
 
         Raises:
-            KeyError: se non esiste un dataset HurtLex per la lingua richiesta.
+            KeyError: if no HurtLex dataset exists for the requested language.
         """
         import pandas as pd
         from core.helpers.paths import resource_path
@@ -117,3 +114,11 @@ class Guardrail:
 
         hurtlex_df = pd.read_csv(resource_path(filename), sep="\t")
         return set(hurtlex_df["lemma"].dropna().tolist())
+
+    @staticmethod
+    def redact_terms(text: str, terms: list[str]) -> str:
+        """Replaces banned words with the word chosen in settings."""
+        for term in terms:
+            pattern = re.compile(rf'\b{re.escape(term)}\b', re.IGNORECASE)
+            text = pattern.sub(Settings().censor_word, text)
+        return text
