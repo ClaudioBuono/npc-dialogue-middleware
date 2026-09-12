@@ -117,7 +117,18 @@ def generate_dialogue(npc_context: NPCContext):
     response_class=StreamingResponse,
     summary="Starts NPC Dialogue using streaming mode",
     description="Streams the generated dialogue line by line to reduce perceived latency for the player, cleaning the dialogue history.",
-    responses={**ALL_ERROR_RESPONSES, 200: {"description": "Stream of dialogue text."}},
+    responses={
+            **ALL_ERROR_RESPONSES,
+            200: {
+                "description": "Stream of dialogue text.",
+                "headers": {
+                    "X-Profanity-Mode-Warning": {
+                        "description": "Warning message when STOP mode profanity filter falls back to CENSOR mode during streaming.",
+                        "type": "string"
+                    }
+                }
+            },
+        },
 )
 def start_dialogue_stream(npc_context: NPCContext):
     if Orchestrator().game_context is None:
@@ -152,7 +163,15 @@ def start_dialogue_stream(npc_context: NPCContext):
     description="Streams the generated dialogue line by line to reduce perceived latency for the player, without cleaning the dialogue history.",
     responses={
         **ALL_ERROR_RESPONSES,
-        200: {"description": "Stream of dialogue text."},
+        200: {
+            "description": "Stream of dialogue text.",
+            "headers": {
+                "X-Profanity-Mode-Warning": {
+                    "description": "Warning message when STOP mode profanity filter falls back to CENSOR mode during streaming.",
+                    "type": "string"
+                }
+            }
+        },
     },
 )
 def continue_dialogue_stream(request: DialogueStreamRequest):

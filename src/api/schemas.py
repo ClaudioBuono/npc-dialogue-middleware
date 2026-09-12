@@ -85,6 +85,9 @@ class ToggleRequest(BaseModel):
     """Generic request body for boolean feature toggles."""
     enabled: bool = Field(..., description="True to enable the feature, false to disable it.")
 
+class CensorWordRequest(BaseModel):
+    """Request body for updating the word used to censor filtered content."""
+    word: str = Field(..., min_length=1, max_length=32, description="The replacement word used for censoring filtered content.")
 
 class NumberOfOptionsRequest(BaseModel):
     """Request body for setting the number of dialogue options generated per turn."""

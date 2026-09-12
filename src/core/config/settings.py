@@ -220,6 +220,20 @@ class Settings:
         )
 
     @classmethod
+    def update_censor_word(cls, censor_word: str) -> None:
+        """Updates the censor word, loading defaults first if needed.
+        
+        Args:
+            censor_word: The new censor word.
+        """
+        if cls._settings is None:
+            cls()  # force loading with defaults
+        cls._settings.censor_word = censor_word
+        logger.info(
+            f"Censor word updated: {censor_word}"
+        )
+    
+    @classmethod
     def get_current(cls) -> AppSettings:
         """Return the currently loaded settings, loading defaults first if needed.
 
