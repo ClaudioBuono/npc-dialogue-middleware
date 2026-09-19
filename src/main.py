@@ -4,8 +4,9 @@ from pathlib import Path
 from fastapi import FastAPI
 import uvicorn
 from api import generate, settings
+from contextlib import asynccontextmanager
 from api.handlers import register_exception_handlers
-
+from core.composition_root import build_orchestrator, build_dialogue_service
 from core.helpers.formatters import to_json_format
 from core.state_manager import StateManager
 from core.helpers.logger import setup_logging
@@ -32,9 +33,20 @@ def _setup_telemetry_store():
     TelemetryStore.instance().initialize_models(model_ids)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # -- Startup: composition root -----------------------------------------
+    orchestrator = build_orchestrator()
+    dialogue_service = build_dialogue_service()
+
+    app.state.orchestrator = orchestrator
+    app.state.dialogue_service = dialogue_service
+
+    yield
+
 def create_app() -> FastAPI:
     """Build and configure the FastAPI application instance."""
-    app = FastAPI(title="NPC Middleware")
+    app = FastAPI(title="NPC Middleware", lifespan=lifespan)
     app.include_router(generate.router)
     app.include_router(settings.router)
     register_exception_handlers(app)

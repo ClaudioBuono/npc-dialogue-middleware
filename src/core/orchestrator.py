@@ -25,10 +25,7 @@ class Orchestrator:
         pre_processor:    Instance of PreProcessor.
         llm_handler:      Instance of LLMHandler.
     """
-
-    """Holds validated game context for middleware operations."""
-    game_context: GameContext | None = None
-
+    
     _instance: "Orchestrator | None" = None
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "Orchestrator":
@@ -37,26 +34,33 @@ class Orchestrator:
             cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        guardrail: Guardrail | None = None,
+        dialogue_history: DialogueHistory | None = None,
+        contract_builder: ContractBuilder | None = None,
+        llm_router: LLMRouter | None = None,
+        dialogue_generator: DialogueGenerator | None = None,
+        dialogue_composer: DialogueOutputComposer | None = None,
+    ) -> None:
         if self._initialized:
             return
-        self.contract_builder: ContractBuilder = ContractBuilder()
-        self.llm_router: LLMRouter = LLMRouter()
-        self.dialogue_generator: DialogueGenerator = DialogueGenerator()
-        self.dialogue_history: DialogueHistory = DialogueHistory()
-        self.dialogue_composer: DialogueOutputComposer = DialogueOutputComposer()
-        self.guardrail: Guardrail = Guardrail()
+
+        self.contract_builder = contract_builder or ContractBuilder()
+        self.llm_router = llm_router or LLMRouter()
+        self.dialogue_generator = dialogue_generator or DialogueGenerator()
+        self.dialogue_composer = dialogue_composer or DialogueOutputComposer()
+        self.dialogue_history = dialogue_history or DialogueHistory()
+        self.guardrail = guardrail or Guardrail()
+
+        self.game_context: GameContext | None = None
+
 
         self._iterations = 0
         self._initialized = True
 
     @classmethod
     def get_instance(cls) -> "Orchestrator":
-        """
-        Return the already-created singleton instance.
-        If it has never been created (no one has called Orchestrator()
-        yet, with or without arguments), create it with default values.
-        """
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
@@ -68,6 +72,8 @@ class Orchestrator:
 
     # Orchestrator Methods ----------------------------------------------------------------------------
 
+
+    """Holds validated game context for middleware operations."""
     def set_game_context(self, game_context: GameContext) -> None:
         """Set the game context by validating environment, epoch, and lore."""
 
@@ -121,6 +127,7 @@ class Orchestrator:
 
         return composed_dialogue
 
+    
 
     def generate_dialogue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
         """Generate NPC dialogue using the NPC and game context via streaming."""

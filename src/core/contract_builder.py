@@ -203,7 +203,6 @@ class ContractBuilder:
             if intent.must_use_expression:
                 lines.append(f"- You MUST USE the following expression in the dialogue: {intent.must_use_expression}")
 
-            # TODO: Number of max options configurable
             if intent.has_options:
                 lines.append(DIALOGUE_OPTIONS_PROMPT.format(number_of_options = Settings().number_of_options))
 

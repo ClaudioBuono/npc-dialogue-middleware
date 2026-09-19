@@ -1,7 +1,9 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse, StreamingResponse
+from api.dependencies import get_dialogue_service
 from api.handlers import MIDDLEWARE_ERROR_STATUS_MAP
 from core.config.settings import Settings
+from core.dialogue_service import DialogueService
 from core.state_manager import StateManager
 from core.orchestrator import Orchestrator
 from core.tools import pre_processing
@@ -71,13 +73,8 @@ def middleware_status():
               200: {"description": "Context set successfully."}
               }
 )
-def set_game_context(game_context: GameContext):
+def set_game_context(game_context: GameContext, service: DialogueService = Depends(get_dialogue_service),):
 
-    if not StateManager().is_in(MiddlewareState.IDLE):
-        raise MiddlewareError(code=MiddlewareErrorCode.SETTING_CONTEXT, errors=["The middleware is busy setting the game context."])
-
-    if not Orchestrator().guardrail.validate_game_context(game_context):
-        raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the game context."])
 
     game_context = pre_processing.normalize_and_validate_game_context(game_context)
 
@@ -92,7 +89,7 @@ def set_game_context(game_context: GameContext):
 	description="Generates dialogue and available player responses based on the provided NPC context and current intent.",
 	responses={**ALL_ERROR_RESPONSES, 200: {"description": "Dialogue generated successfully."}}
 )
-def generate_dialogue(npc_context: NPCContext):
+def generate_dialogue(npc_context: NPCContext, service: DialogueService = Depends(get_dialogue_service)):
 
     if Orchestrator().game_context is None:
         raise MiddlewareError(code=MiddlewareErrorCode.CONTEXT_NOT_SET, errors=["Game context is not set."])
@@ -101,7 +98,7 @@ def generate_dialogue(npc_context: NPCContext):
         raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
 
     if not Orchestrator().guardrail.validate_npc_context(npc_context):
-            raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the npc context."])
+        raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the npc context."])
         
     npc_context = pre_processing.normalize_and_validate_npc_context(npc_context)
     
@@ -130,29 +127,14 @@ def generate_dialogue(npc_context: NPCContext):
             },
         },
 )
-def start_dialogue_stream(npc_context: NPCContext):
-    if Orchestrator().game_context is None:
-        raise MiddlewareError(code=MiddlewareErrorCode.CONTEXT_NOT_SET, errors=["Game context is not set."])
-
-    if not StateManager().is_in(MiddlewareState.IDLE):
-        raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
-
+def start_dialogue_stream(npc_context: NPCContext, service: DialogueService = Depends(get_dialogue_service)):
     headers = {}
-
     if Settings().profanity_mode == ProfanityMode.STOP:
         headers["X-Profanity-Mode-Warning"] = (
             "STOP mode profanity filter cannot be used in streaming, continuing dialog in CENSOR mode."
         )
 
-    if not Orchestrator().guardrail.validate_npc_context(npc_context):
-        raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the npc context."])
-    
-    npc_context = pre_processing.normalize_and_validate_npc_context(npc_context)
-
-    Orchestrator().dialogue_history.clear_dialogue_history()
-
-    stream = Orchestrator().generate_dialogue_stream(npc_context, None)
-
+    stream, headers = service.start_stream(npc_context)
     return StreamingResponse(stream, media_type="text/plain", headers=headers)
 
 
@@ -174,16 +156,7 @@ def start_dialogue_stream(npc_context: NPCContext):
         },
     },
 )
-def continue_dialogue_stream(request: DialogueStreamRequest):
-    if Orchestrator().game_context is None:
-        raise MiddlewareError(code=MiddlewareErrorCode.CONTEXT_NOT_SET, errors=["Game context is not set."])
-
-    if Orchestrator().dialogue_history.is_empty():
-        raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["Dialogue history is empty."])
-
-    if not StateManager().is_in(MiddlewareState.IDLE):
-        raise MiddlewareError(code=MiddlewareErrorCode.GENERATING, errors=["The middleware is busy generating."])
-
+def continue_dialogue_stream(request: DialogueStreamRequest, service: DialogueService = Depends(get_dialogue_service)):
     headers = {}
     
     if Settings().profanity_mode == ProfanityMode.STOP:
@@ -191,13 +164,5 @@ def continue_dialogue_stream(request: DialogueStreamRequest):
             "STOP mode profanity filter cannot be used in streaming, continuing dialog in CENSOR mode."
         )
 
-    npc_context = request.npc_context
-
-    if not Orchestrator().guardrail.validate_npc_context(npc_context):
-        raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the npc context."])
-
-    npc_context = pre_processing.normalize_and_validate_npc_context(npc_context)
-
-    stream = Orchestrator().generate_dialogue_stream(npc_context, request.last_player_choice)
-
+    stream, headers = service.continue_stream(request.npc_context, request.last_player_choice)
     return StreamingResponse(stream, media_type="text/plain", headers=headers)
