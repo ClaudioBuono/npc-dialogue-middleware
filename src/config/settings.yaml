@@ -6,4 +6,4 @@ profanity_filter: true
 prompt_fairness_filter: true
 profanity_mode : "censor"
 llm:
-  default_temperature: 0.3
+  temperature: 0.3

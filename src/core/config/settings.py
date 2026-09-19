@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class LLMSettings(BaseModel):
     """Configuration for the language model used to generate dialogue."""
 
-    default_temperature: float = Field(0.7, ge=0.0, le=2.0)
+    temperature: float = Field(0.7, ge=0.0, le=2.0)
 
 
 class AppSettings(BaseModel):
@@ -202,7 +202,7 @@ class Settings:
             cls()  # force loading with defaults
         cls._settings.llm = llm_settings
         logger.info(
-            f"LLM settings updated: temperature={llm_settings.default_temperature}"
+            f"LLM settings updated: temperature={llm_settings.temperature}"
         )
 
     @classmethod

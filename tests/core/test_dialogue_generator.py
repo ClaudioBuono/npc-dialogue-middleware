@@ -29,7 +29,7 @@ def dummy_contract():
 def test_generate(generator, mock_client, dummy_contract):
     result = generator.generate(dummy_contract)
     assert result == '{"dialogue": "Hello!"}'
-    mock_client.generate.assert_called_once_with(dummy_contract, temperature=Settings().llm.default_temperature)
+    mock_client.generate.assert_called_once_with(dummy_contract, temperature=Settings().llm.temperature)
 
 def test_generate_stream(generator, mock_client, dummy_contract):
     stream = generator.generate_stream(dummy_contract)

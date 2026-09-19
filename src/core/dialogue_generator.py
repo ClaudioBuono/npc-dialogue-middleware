@@ -16,10 +16,10 @@ class DialogueGenerator:
 
     #TODO: Manage exceptions
     def generate(self, contract: Contract) -> str:
-        return self._client.generate(contract, temperature=Settings().llm.default_temperature)
+        return self._client.generate(contract, temperature=Settings().llm.temperature)
     
     def set_client(self, client: OpenAICompatibleClient) -> None:
         self._client = client
 
     def generate_stream(self, contract: Contract) -> Iterator[str]:
-        return self._client.generate_streaming(contract, temperature=Settings().llm.default_temperature)
+        return self._client.generate_streaming(contract, temperature=Settings().llm.temperature)
