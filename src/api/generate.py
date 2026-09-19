@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse, StreamingResponse
-from api.dependencies import get_dialogue_service
+from api.dependencies import get_generate_service
 from api.handlers import MIDDLEWARE_ERROR_STATUS_MAP
 from core.config.settings import Settings
-from core.dialogue_service import DialogueService
+from core.generate_service import GenerateService
 from core.state_manager import StateManager
 from core.orchestrator import Orchestrator
 from core.tools import pre_processing
@@ -73,13 +73,8 @@ def middleware_status():
               200: {"description": "Context set successfully."}
               }
 )
-def set_game_context(game_context: GameContext, service: DialogueService = Depends(get_dialogue_service),):
-
-
-    game_context = pre_processing.normalize_and_validate_game_context(game_context)
-
-    Orchestrator().set_game_context(game_context)
-
+def set_game_context(game_context: GameContext, service: GenerateService = Depends(get_generate_service)):
+    service.set_game_context(game_context)
     return {"status": "ok"}
 
 @router.post(
@@ -89,7 +84,7 @@ def set_game_context(game_context: GameContext, service: DialogueService = Depen
 	description="Generates dialogue and available player responses based on the provided NPC context and current intent.",
 	responses={**ALL_ERROR_RESPONSES, 200: {"description": "Dialogue generated successfully."}}
 )
-def generate_dialogue(npc_context: NPCContext, service: DialogueService = Depends(get_dialogue_service)):
+def generate_dialogue(npc_context: NPCContext, service: GenerateService = Depends(get_generate_service)):
 
     if Orchestrator().game_context is None:
         raise MiddlewareError(code=MiddlewareErrorCode.CONTEXT_NOT_SET, errors=["Game context is not set."])
@@ -127,7 +122,7 @@ def generate_dialogue(npc_context: NPCContext, service: DialogueService = Depend
             },
         },
 )
-def start_dialogue_stream(npc_context: NPCContext, service: DialogueService = Depends(get_dialogue_service)):
+def start_dialogue_stream(npc_context: NPCContext, service: GenerateService = Depends(get_generate_service)):
     headers = {}
     if Settings().profanity_mode == ProfanityMode.STOP:
         headers["X-Profanity-Mode-Warning"] = (
@@ -156,7 +151,7 @@ def start_dialogue_stream(npc_context: NPCContext, service: DialogueService = De
         },
     },
 )
-def continue_dialogue_stream(request: DialogueStreamRequest, service: DialogueService = Depends(get_dialogue_service)):
+def continue_dialogue_stream(request: DialogueStreamRequest, service: GenerateService = Depends(get_generate_service)):
     headers = {}
     
     if Settings().profanity_mode == ProfanityMode.STOP:

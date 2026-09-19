@@ -6,7 +6,7 @@ import uvicorn
 from api import generate, settings
 from contextlib import asynccontextmanager
 from api.handlers import register_exception_handlers
-from core.composition_root import build_orchestrator, build_dialogue_service
+from core.composition_root import build_generate_service, build_orchestrator
 from core.helpers.formatters import to_json_format
 from core.state_manager import StateManager
 from core.helpers.logger import setup_logging
@@ -35,12 +35,13 @@ def _setup_telemetry_store():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Handles the startup and shutdown of the FastAPI application."""
+
     # -- Startup: composition root -----------------------------------------
     orchestrator = build_orchestrator()
-    dialogue_service = build_dialogue_service()
+    generate_service = build_generate_service(orchestrator)
 
-    app.state.orchestrator = orchestrator
-    app.state.dialogue_service = dialogue_service
+    app.state.dialogue_service = generate_service
 
     yield
 
@@ -139,10 +140,8 @@ def main():
     logger = logging.getLogger(__name__)
     logger.info("Starting middleware")
 
-
-
-    # Instantiate Orchestrator singleton
-    Orchestrator()
+    # # Instantiate Orchestrator singleton
+    # Orchestrator()
     
     ModelRegistry().set_models(profiler = Settings().profiling)
 

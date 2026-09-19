@@ -1,7 +1,7 @@
 from core.guardrail import Guardrail
 from core.tools.history import DialogueHistory
 from core.orchestrator import Orchestrator
-from core.dialogue_service import DialogueService
+from core.generate_service import GenerateService
 
 
 def build_orchestrator() -> Orchestrator:
@@ -18,12 +18,11 @@ def build_orchestrator() -> Orchestrator:
     return orchestrator
 
 
-def build_dialogue_service() -> DialogueService:
+def build_generate_service(orchestrator: Orchestrator) -> GenerateService:
     """
     Builds the DialogueService using the orchestrator instance.
     """
-    orchestrator = Orchestrator.get_instance()
-    return DialogueService(
+    return GenerateService(
         orchestrator=orchestrator,
         guardrail=orchestrator.guardrail,
         dialogue_history=orchestrator.dialogue_history,
