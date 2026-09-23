@@ -1,6 +1,7 @@
 from typing import Any, Optional, Iterator
 import logging
 from api.schemas import ComposedDialogue
+from core.judger import Judger
 from core.state_manager import StateManager
 from core.config.settings import Settings
 from core.contract_builder import ContractBuilder
@@ -99,7 +100,7 @@ class Orchestrator:
             logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
 
 
-        contract = self.contract_builder.build(self.game_context, npc_context, self.dialogue_history.get_dialogue_history())
+        contract = self.contract_builder.build_dialogue_contract(self.game_context, npc_context, self.dialogue_history.get_dialogue_history())
 
         client: OpenAICompatibleClient = self.llm_router.select_model(game_context = self.game_context, npc_context = npc_context)
         logger.debug(f"Selected LLM client: {type(client).__name__}")
@@ -108,6 +109,13 @@ class Orchestrator:
         raw_dialogue: str = self.dialogue_generator.generate(contract)
 
         composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, raw_dialogue)
+
+
+        judge_contract = self.contract_builder.build_judge_contract(composed_dialogue, self.game_context, npc_context)
+        judger: Judger = Judger(client)
+
+        judge_output = judger.generate(judge_contract)
+        print(judge_output)
 
         if Settings().profanity_mode != ProfanityMode.DISABLED:
             valid_output: bool = self.guardrail.validate_composed_output(composed_dialogue)
@@ -139,7 +147,7 @@ class Orchestrator:
             self.dialogue_history.add_player_dialogue_to_history(last_player_choice)
             logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
 
-        contract = self.contract_builder.build(self.game_context, npc_context, self.dialogue_history.get_dialogue_history())
+        contract = self.contract_builder.build_dialogue_contract(self.game_context, npc_context, self.dialogue_history.get_dialogue_history())
 
         client: OpenAICompatibleClient = self.llm_router.select_model(game_context=self.game_context, npc_context=npc_context)
         logger.debug(f"Selected LLM client: {type(client).__name__}")

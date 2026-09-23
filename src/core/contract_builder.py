@@ -1,6 +1,7 @@
 from typing import Any, Dict
+from api.schemas import ComposedDialogue
 from core.config.settings import Settings
-from core.helpers.formatters import format_dialogue_history
+from core.helpers.formatters import format_composed_dialogue, format_dialogue_history, format_game_context, format_npc_content
 from core.types.dataclasses import Contract
 from core.types.contexts import *
 from core.llm.prompts import *
@@ -13,7 +14,75 @@ class ContractBuilder:
     combining game_context and npc_context.
     """
 
-    def build(self, game_context: GameContext, npc_context: NPCContext, dialogue_history: List[Dict[str,str]]) -> Contract:
+    def build_judge_contract(self, composed_dialogue: ComposedDialogue, game_context: GameContext, npc_context: NPCContext,
+    ) -> Contract:
+        """Build the execution contract for the judge LLM evaluation task.
+
+        Formats the dialogue, game, and NPC contexts into system and user prompts,
+        and defines the expected JSON schema output for validating dialogue compliance
+        against fixed evaluation rules.
+
+        Args:
+            composed_dialogue (ComposedDialogue): The composed dialogue instance to be evaluated.
+            game_context (GameContext): The global game state and environment context.
+            npc_context (NPCContext): The NPC profile, personality, and dialogue parameters.
+
+        Returns:
+            Contract: A Contract instance containing the assembled system prompt, user prompt,
+            and JSON output schema.
+        """
+        formatted_dialogue = format_composed_dialogue(composed_dialogue)
+        formatted_npc_context = format_npc_content(npc_context)
+        formatted_game_context = format_game_context(game_context)
+
+        judge_body_prompt = JUDGE_BODY_PROMPT.format(
+            npc_context=formatted_npc_context,
+            game_context=formatted_game_context,
+            dialogue=formatted_dialogue,
+        )
+
+        system_prompt_lines = [
+            JUDGE_BASE_PROMPT,
+            JUDGE_RULES_PROMPT,
+        ]
+
+        system_prompt = "\n\n".join(system_prompt_lines)
+
+        user_prompt_lines = [
+            JUDGE_TASK_PROMPT.format(default_language=Settings().language.name),
+            judge_body_prompt,
+        ]
+        user_prompt = "\n\n".join(user_prompt_lines)
+
+        JUDGE_OUTPUT_SCHEMA = {
+            "type": "object",
+            "properties": {
+                "answers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "answer": {"type": "boolean"},
+                            "reason": {"type": "string"},
+                        },
+                        "required": ["id", "answer", "reason"],
+                        "additionalProperties": False,
+                    },
+                }
+            },
+            "required": ["answers"],
+            "additionalProperties": False,
+        }
+
+        return Contract(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            output_schema=JUDGE_OUTPUT_SCHEMA,
+        )
+
+
+    def build_dialogue_contract(self, game_context: GameContext, npc_context: NPCContext, dialogue_history: List[Dict[str,str]]) -> Contract:
         """
         Orchestrates the construction of the generation Contract for the LLM.
 
