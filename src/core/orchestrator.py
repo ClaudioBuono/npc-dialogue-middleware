@@ -37,22 +37,24 @@ class Orchestrator:
 
     def __init__(
         self,
-        guardrail: Guardrail | None = None,
-        dialogue_history: DialogueHistory | None = None,
-        contract_builder: ContractBuilder | None = None,
-        llm_router: LLMRouter | None = None,
-        dialogue_generator: DialogueGenerator | None = None,
-        dialogue_composer: DialogueOutputComposer | None = None,
+        guardrail: Guardrail,
+        dialogue_history: DialogueHistory,
+        contract_builder: ContractBuilder,
+        llm_router: LLMRouter,
+        dialogue_generator: DialogueGenerator,
+        dialogue_composer: DialogueOutputComposer,
+        judger: Judger
     ) -> None:
         if self._initialized:
             return
 
-        self.contract_builder = contract_builder or ContractBuilder()
-        self.llm_router = llm_router or LLMRouter()
-        self.dialogue_generator = dialogue_generator or DialogueGenerator()
-        self.dialogue_composer = dialogue_composer or DialogueOutputComposer()
-        self.dialogue_history = dialogue_history or DialogueHistory()
-        self.guardrail = guardrail or Guardrail()
+        self.contract_builder = contract_builder
+        self.llm_router = llm_router
+        self.dialogue_generator = dialogue_generator
+        self.dialogue_composer = dialogue_composer
+        self.dialogue_history = dialogue_history
+        self.guardrail = guardrail
+        self.judger = judger
 
         self.game_context: GameContext | None = None
 
@@ -106,16 +108,12 @@ class Orchestrator:
         logger.debug(f"Selected LLM client: {type(client).__name__}")
 
         self.dialogue_generator.set_client(client)
+        self.judger.set_client(client)
+
         raw_dialogue: str = self.dialogue_generator.generate(contract)
 
         composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, raw_dialogue)
-
-        judger: Judger = Judger(client)
-        judge_questions = judger.build_questions(Settings().language.name)
-        judge_contract = self.contract_builder.build_judge_contract(composed_dialogue, self.game_context, npc_context, judge_questions)
-
-        judge_output = judger.generate(judge_contract)
-        print(judge_output)
+       
 
         if Settings().profanity_mode != ProfanityMode.DISABLED:
             valid_output: bool = self.guardrail.validate_composed_output(composed_dialogue)

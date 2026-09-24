@@ -86,6 +86,7 @@ def set_game_context(game_context: GameContext, service: GenerateService = Depen
 )
 def generate_dialogue(npc_context: NPCContext, service: GenerateService = Depends(get_generate_service)):
 
+    # TODO: to refactor with current architecture
     if Orchestrator().game_context is None:
         raise MiddlewareError(code=MiddlewareErrorCode.CONTEXT_NOT_SET, errors=["Game context is not set."])
        
