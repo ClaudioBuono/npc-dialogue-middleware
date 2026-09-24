@@ -12,13 +12,46 @@ class Judger:
     """
 
     def __init__(self, client: OpenAICompatibleClient | None) -> None:
+        """Initialize the generator with an optional LLM client.
+
+        Args:
+            client: The OpenAI-compatible client used to generate dialogue.
+                May be None if no client is configured.
+        """
         self._client = client
 
     def generate(self, contract: Contract) -> str:
+        """Generate dialogue text for the given contract.
+
+        Uses the configured client to produce a response, applying the
+        temperature defined in the application settings.
+
+        Args:
+            contract: The contract describing the generation request
+                (e.g. game context, NPC context, world state).
+
+        Returns:
+            The generated dialogue as a string.
+        """
         return self._client.generate(contract, temperature=Settings().llm.temperature)
 
     @staticmethod
     def build_questions(default_language: str) -> list[JudgeQuestion]:
+        """Build the standard set of judge questions used to evaluate dialogue.
+
+        Each question targets a specific quality dimension of the generated
+        dialogue: faithfulness to context, consistency with the game/NPC/world
+        state, adherence to the NPC's persona, correctness of named entities,
+        and language compliance.
+
+        Args:
+            default_language: The language the dialogue is expected to be
+                written in, used to build the language-check question.
+
+        Returns:
+            A list of JudgeQuestion instances covering faithfulness,
+            consistency, persona consistency, entity check, and language.
+        """
         return [
             JudgeQuestion(
                 "faithfulness",

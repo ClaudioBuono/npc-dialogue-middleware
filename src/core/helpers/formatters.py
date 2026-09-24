@@ -81,13 +81,17 @@ def format_composed_dialogue(composed_dialogue: ComposedDialogue) -> str:
 
 def format_judge_questions(questions: List[JudgeQuestion]) -> str:
     """
-    Format a list of questions into human-readable text for an LLM prompt.
+    Format a list of JudgeQuestion instances into a human-readable text for an LLM prompt.
+
+    Args:
+        questions: List of JudgeQuestion instances to format.
+
+    Returns:
+        A formatted multi-line string ready to be embedded in the prompt.
     """
     formatted_questions: List[str] = []
 
-    i = 0
-    for question in questions:
-        i += 1
+    for i, question in enumerate(questions, 1):
         formatted = f"{i}. [{question.id.capitalize()}] {question.text}"
         formatted_questions.append(formatted)
 

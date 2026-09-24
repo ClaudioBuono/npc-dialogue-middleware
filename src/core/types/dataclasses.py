@@ -13,7 +13,7 @@ class Contract:
 @dataclass(frozen=True)
 class JudgeQuestion:
     """
-    DA COMMENTARE AO NON PUSHARE QUESTA ROBA
+    A question for the judge to evaluate.
     """
     id: str
     text: str

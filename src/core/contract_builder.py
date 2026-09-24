@@ -349,15 +349,20 @@ class ContractBuilder:
 
     # Helper methods for Judge prompt -------------------------------------------------------
     def _build_judge_system_prompt(self) -> str:
+        """
+        Builds the system prompt for the Judge, which includes the base prompt and rules.
+        """
         system_prompt_lines = [
             JUDGE_BASE_PROMPT,
             JUDGE_RULES_PROMPT,
-        ] 
+        ]
 
-        return "\n\n".join(system_prompt_lines) 
-        
+        return "\n\n".join(system_prompt_lines)
 
     def _build_judge_user_prompt(self, composed_dialogue: ComposedDialogue, game_context: GameContext, npc_context: NPCContext, questions: List[JudgeQuestion]) -> str:
+        """
+        Builds the user prompt for the Judge, which includes the formatted dialogue, NPC context, game context, and judge questions.
+        """
         formatted_dialogue = format_composed_dialogue(composed_dialogue)
         formatted_npc_context = format_npc_content(npc_context)
         formatted_game_context = format_game_context(game_context)
