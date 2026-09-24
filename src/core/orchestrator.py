@@ -110,9 +110,9 @@ class Orchestrator:
 
         composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, raw_dialogue)
 
-
-        judge_contract = self.contract_builder.build_judge_contract(composed_dialogue, self.game_context, npc_context)
         judger: Judger = Judger(client)
+        judge_questions = judger.build_questions(Settings().language.name)
+        judge_contract = self.contract_builder.build_judge_contract(composed_dialogue, self.game_context, npc_context, judge_questions)
 
         judge_output = judger.generate(judge_contract)
         print(judge_output)

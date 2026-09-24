@@ -132,23 +132,7 @@ JUDGE_TASK_PROMPT = inspect.cleandoc("""
     or false for each question — do not skip any.
 
     FIXED QUESTIONS (For all checks: TRUE = Passed / Good, FALSE = Failed / Has Issue):
-    1. [faithfulness] Is every claim in the dialogue fully supported by the provided game and NPC context, without inventing facts?
-    2. [consistency] Is the dialogue fully consistent with the game context, NPC context, and current world state (no contradictions)?
-    3. [persona_consistency] Does the dialogue match the NPC's personality, talkativeness level, and relationship with the main character?
-    4. [entity_check] Are all named entities in the dialogue (people, places, items, factions) either present in the context or plausible within it?
-    5. [language] Is the dialogue written in {default_language} or in a language consistent with the NPC's allowed languages?
-
-    RESPONSE FORMAT:
-    Respond with a JSON array, one object per question, in the same order
-    listed above (fixed questions first, then targeted questions), using
-    this exact shape:
-    [
-      {{
-        "id": "<the bracketed id for fixed questions, or the question text itself for targeted questions>",
-        "answer": <true or false>,
-        "reason": "<one short sentence; mandatory when answer is false, omit or leave empty when true>"
-      }}
-    ]
+    {questions}
 """)
 
 JUDGE_BODY_PROMPT = inspect.cleandoc("""

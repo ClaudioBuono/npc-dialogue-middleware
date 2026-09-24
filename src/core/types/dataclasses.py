@@ -9,3 +9,11 @@ class Contract:
     system_prompt: str
     user_prompt: str
     output_schema: dict[str, Any] = field(default_factory=dict)
+
+@dataclass(frozen=True)
+class JudgeQuestion:
+    """
+    DA COMMENTARE AO NON PUSHARE QUESTA ROBA
+    """
+    id: str
+    text: str

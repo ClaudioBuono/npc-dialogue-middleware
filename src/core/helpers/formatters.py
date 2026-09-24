@@ -1,11 +1,12 @@
 import dataclasses
 import json
-from typing import Union
+from typing import List, Union
 
 from pydantic import BaseModel
 
 from api.schemas import ComposedDialogue
 from core.types.contexts import Dialogue, GameContext, NPCContext, Quest
+from core.types.dataclasses import JudgeQuestion
 
 
 def format_dialogue_history(history: list[dict[str, str]], npc_name: str) -> str:
@@ -78,6 +79,19 @@ def format_composed_dialogue(composed_dialogue: ComposedDialogue) -> str:
 
     return "\n\n".join(sections)
 
+def format_judge_questions(questions: List[JudgeQuestion]) -> str:
+    """
+    Format a list of questions into human-readable text for an LLM prompt.
+    """
+    formatted_questions: List[str] = []
+
+    i = 0
+    for question in questions:
+        i += 1
+        formatted = f"{i}. [{question.id.capitalize()}] {question.text}"
+        formatted_questions.append(formatted)
+
+    return "\n".join(formatted_questions)
 
 def _format_intent(intent: Union[Quest, Dialogue]) -> str:
     """Format a conversation intent (Quest or Dialogue) into key-value prompt lines.
