@@ -25,11 +25,14 @@ class RoutingConfigErrorCode(Enum):
     MISSING_INTENDED_TIER = "missing_intended_tier"
 
 class MiddlewareErrorCode(Enum):
+    """Semantic error codes identifying the phase or reason for a middleware failure."""
+
     STARTING = "starting"
     SETTING_CONTEXT = "setting_context"
     CONTEXT_NOT_SET = "context_not_set"
     REFUSED = "refused"
     GENERATING = "generating"
+    INVALID_RESPONSE = "invalid_response"
 
 
 # Error parsing ----------------------------------------------------------
@@ -70,7 +73,13 @@ class RoutingConfigError(Exception):
         super().__init__(f"[{code.value}] " + "; ".join(errors))
 
 class MiddlewareError(Exception):
-    
+    """
+    Exception raised for errors occurring during the middleware lifecycle.
+
+    Carries a semantic error code (`MiddlewareErrorCode`) identifying the
+    failure phase, along with a list of human-readable error messages
+    describing what went wrong.
+    """
 
     def __init__(self, code: MiddlewareErrorCode, errors: list[str]):
         self.code = code

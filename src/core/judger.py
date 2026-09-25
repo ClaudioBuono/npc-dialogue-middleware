@@ -1,10 +1,15 @@
 from __future__ import annotations
+import json
+from typing import Any
+
+from pydantic import ValidationError
 from api.schemas import ComposedDialogue
 from core.config.settings import Settings
 from core.contract_builder import ContractBuilder
 from core.llm.openai_client import OpenAICompatibleClient
+from core.tools.errors import MiddlewareError, MiddlewareErrorCode, PreProcessingError, ValidationErrorCode
 from core.types.contexts import GameContext, NPCContext
-from core.types.dataclasses import Contract, JudgeQuestion
+from core.types.dataclasses import Contract, JudgeIssue, JudgeOutput, JudgeProblem, JudgeQuestion
 
 
 class Judger:
@@ -21,13 +26,35 @@ class Judger:
                 May be None if no client is configured.
         """
         self.contract_builder = contract_builder
-        self.score = 1
 
 
     def set_client(self, client: OpenAICompatibleClient) -> None:
         self._client = client
 
+    def judge_dialogue(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext, game_context: GameContext) -> list[JudgeIssue]:
+        # Build contract
+        judge_questions = self._build_questions(Settings().language.name)
+        judge_contract = self.contract_builder.build_judge_contract(composed_dialogue, game_context, npc_context, judge_questions)
 
+        # Parse response and check its validity 
+        judge_output_raw = self._client.generate(judge_contract, temperature = 0.0) # TODO: Test higher temperatures
+        try:
+            judge_output = JudgeOutput.model_validate_json(judge_output_raw)
+        except ValidationError as e:
+            raise PreProcessingError(code=ValidationErrorCode.INVALID_VALUE, errors=[f"Judge output does not match expected schema: {e}", f"Raw output: {judge_output_raw}"])
+        
+        if not self._check_valid_response(judge_output, judge_questions):
+            raise MiddlewareError(code=MiddlewareErrorCode.INVALID_RESPONSE, errors=["There was a problem during the judging process."])
+
+        # Extract problems (where the answer is False)
+        judge_problems: list[JudgeProblem] = [p for p in judge_output.answers if not p.answer]
+
+        # Build issues array
+        issues = self._map_judge_issues(judge_problems)
+        static_issues = self._judge_static_format(composed_dialogue, npc_context)
+        return [issues, static_issues]
+
+    # Helper methods --------------------------------------------------------------------------------
     def _build_questions(self, default_language: str) -> list[JudgeQuestion]:
         """Build the standard set of judge questions used to evaluate dialogue.
 
@@ -46,78 +73,105 @@ class Judger:
         """
         return [
             JudgeQuestion(
-                "faithfulness",
-                "Is every claim in the dialogue fully supported by the provided "
+                id="faithfulness",
+                text="Is every claim in the dialogue fully supported by the provided "
                 "game and NPC context, without inventing facts?",
             ),
             JudgeQuestion(
-                "consistency",
-                "Is the dialogue fully consistent with the game context, NPC "
+                id="consistency",
+                text="Is the dialogue fully consistent with the game context, NPC "
                 "context, and current world state (no contradictions)?",
             ),
             JudgeQuestion(
-                "persona_consistency",
-                "Does the dialogue match the NPC's personality, talkativeness "
+                id="persona_consistency",
+                text="Does the dialogue match the NPC's personality, talkativeness "
                 "level, and relationship with the main character?",
             ),
             JudgeQuestion(
-                "entity_check",
-                "Are all named entities in the dialogue (people, places, items, "
+                id="entity_check",
+                text="Are all named entities in the dialogue (people, places, items, "
                 "factions) either present in the context or plausible within it?",
             ),
             JudgeQuestion(
-                "language",
-                f"Is the dialogue written in {default_language} or in a language "
+                id="language",
+                text=f"Is the dialogue written in {default_language} or in a language "
                 "consistent with the NPC's allowed languages?",
             ),
             JudgeQuestion(
-                "fairness",
-                "Is the dialogue free from stereotypes, discriminatory language, "
+                id="fairness",
+                text="Is the dialogue free from stereotypes, discriminatory language, "
                 "or biased characterizations based on gender, ethnicity, religion, "
                 "age, or other identity traits, unless explicitly justified by the "
                 "NPC's established persona or narrative role?",
             ),
         ]
 
-    # TODO: implement static checks and evaluations for the healing
+    def _judge_static_format(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext) -> list[JudgeIssue]:
+        """Run deterministic, non-LLM checks on the dialogue's structure.
 
-    def judge_dialogue(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext, game_context: GameContext):
-        judge_questions = self._build_questions(Settings().language.name)
-        judge_contract = self.contract_builder.build_judge_contract(composed_dialogue, game_context, npc_context, judge_questions)
+        Verifies formatting rules that don't require semantic judgment: use
+        of the NPC's mandatory expression, the expected number of player
+        dialogue options, and the presence of accept/refuse options when
+        the NPC's intent requires a choice.
 
-        # TODO: extract issues list, to test higher temperatures
-        judge_output_raw = self._client.generate(judge_contract, temperature = 0.0)
+        Args:
+            composed_dialogue: The generated dialogue to check.
+            npc_context: Contextual information about the NPC, including
+                its intent and required expression.
 
-        issues = []
-
-        #TODO:
-        # score calculator function based on issues judged and weights
-        #judged_issues = calculate_weigthed_score()
-
-        static_static = self.judge_static_format(composed_dialogue, npc_context)
-        #issues = [judged_issues, static_static]
-        
-        return [self.score, issues]
-
-
-    def judge_static_format(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext):
-
-        issues = []
+        Returns:
+            A list of JudgeIssue instances for each static rule violated.
+            Empty if no violations are found.
+        """
+        issues: list[JudgeIssue] = []
 
         if not npc_context.intent.must_use_expression in composed_dialogue.dialogue:
-            issues.append("- Missing must use expression")
+            issues.append(JudgeIssue(category="Must use expression", issue="Expression is not used in dialogue"))
 
         if len(composed_dialogue.player_options.dialogue_options) != Settings().number_of_options:
-            issues.append("- Incorrect number of options")
+            issues.append(JudgeIssue(category="Number of options", issue="Incorrect number of options"))
 
         if npc_context.intent.has_choice:
             if not(composed_dialogue.player_options.accept and composed_dialogue.player_options.refuse):
-                issues.append("- Missing Accept/Refuse")
-                
-
-        self.score = 0 if issues else self.score
+                issues.append(JudgeIssue(category="Accept/Refuse", issue="Missing Accept/Refuse options"))
 
         return issues
-            
+    
+    def _check_valid_response(self, response: list[JudgeOutput], questions: list[JudgeQuestion]) -> bool:
+        """Check that the judge's response covers exactly the expected questions.
 
-        
+        Args:
+            response: The list of answer entries returned by the judge, each
+                expected to contain at least an "id" key.
+            questions: The list of questions that were asked, used as the
+                source of truth for expected ids.
+
+        Returns:
+            True if response contains exactly one entry per expected
+            question id (regardless of order), False otherwise.
+        """
+        if len(response) != len(questions):
+            return False
+
+        response_ids = {item["id"] for item in response}
+        expected_ids = {q.id for q in questions}
+
+        return response_ids == expected_ids
+
+    def _map_judge_issues(self, judge_problems: list[JudgeProblem]) -> list[JudgeIssue]:
+        """Convert failed judge answers into JudgeIssue instances.
+
+        Args:
+            judge_problems: The judge's answers where the condition did not
+                hold (answer == False).
+
+        Returns:
+            A list of JudgeIssue instances, one per problem, using the
+            question id as category and the judge's reason as the issue text.
+        """
+        issues: list[JudgeIssue] = []
+
+        for problem in judge_problems:
+            issues.append(JudgeIssue(category=problem.id, issue=problem.reason))
+
+        return issues

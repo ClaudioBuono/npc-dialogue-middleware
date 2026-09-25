@@ -32,6 +32,7 @@ MIDDLEWARE_ERROR_STATUS_MAP: dict[MiddlewareErrorCode, int] = {
     MiddlewareErrorCode.CONTEXT_NOT_SET: status.HTTP_409_CONFLICT,
     MiddlewareErrorCode.REFUSED: status.HTTP_403_FORBIDDEN,
     MiddlewareErrorCode.GENERATING: status.HTTP_409_CONFLICT,
+    MiddlewareErrorCode.INVALID_RESPONSE: status.HTTP_502_BAD_GATEWAY,
 }
 
 
