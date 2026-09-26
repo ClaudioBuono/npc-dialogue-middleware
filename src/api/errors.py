@@ -70,6 +70,11 @@ _MIDDLEWARE_STATUS_DESCRIPTIONS: dict[int, dict] = {
         "model": ErrorValidationResponse,
         "description": "Conflict - The middleware is not in a valid state for this request (busy generating or game context not set).",
     },
+    502: {
+        "model": ErrorValidationResponse,
+        "description":
+            "Bad Gateway - The process received an invalid or unparsable response from the LLM, so the generated dialogue could not be validated." 
+    },
     503: {
         "model": ErrorValidationResponse,
         "description": "Service Unavailable - Middleware is starting up or setting context, not ready to serve requests.",
