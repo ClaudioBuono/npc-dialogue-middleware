@@ -1,6 +1,7 @@
 from typing import Any, Optional, Iterator
 import logging
 from api.schemas import ComposedDialogue
+from core.healer import Healer
 from core.judger import Judger
 from core.state_manager import StateManager
 from core.config.settings import Settings
@@ -12,7 +13,7 @@ from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.output_composer import DialogueOutputComposer
 from core.routing.router import LLMRouter
 from core.helpers.formatters import to_json_format
-from core.types.contexts import GameContext, NPCContext
+from core.types.contexts import Dialogue, GameContext, NPCContext
 from core.types.enums import MiddlewareState, ProfanityMode
 
 logger = logging.getLogger(__name__)
@@ -109,11 +110,24 @@ class Orchestrator:
 
         self.dialogue_generator.set_client(client)
         self.judger.set_client(client)
-
         raw_dialogue: str = self.dialogue_generator.generate(contract)
 
         composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, raw_dialogue)
-       
+
+        issues = self.judger.judge_dialogue(composed_dialogue, npc_context, self.game_context)
+        
+        print("COMPOSED DIALOGUE: ", composed_dialogue)
+
+        if len(issues) > 0:
+
+            print("FOUND ISSUES: ", issues)
+            healer: Healer = Healer(contract_builder=self.contract_builder, dialogue_composer=self.dialogue_composer)
+            healer.set_client(client)
+
+            healed_composed_dialogue: ComposedDialogue = healer.heal_dialogue(composed_dialogue, self.game_context, npc_context, issues)
+
+            print("HEAL DIALOGUE: ", healed_composed_dialogue)
+
 
         if Settings().profanity_mode != ProfanityMode.DISABLED:
             valid_output: bool = self.guardrail.validate_composed_output(composed_dialogue)

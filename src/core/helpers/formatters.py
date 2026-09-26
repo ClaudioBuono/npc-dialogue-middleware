@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from api.schemas import ComposedDialogue
 from core.types.contexts import Dialogue, GameContext, NPCContext, Quest
-from core.types.dataclasses import JudgeQuestion
+from core.types.dataclasses import JudgeIssue, JudgeQuestion
 
 
 def format_dialogue_history(history: list[dict[str, str]], npc_name: str) -> str:
@@ -96,6 +96,28 @@ def format_judge_questions(questions: List[JudgeQuestion]) -> str:
         formatted_questions.append(formatted)
 
     return "\n".join(formatted_questions)
+
+def format_judge_issues(issues: list[JudgeIssue]) -> str:
+    """Format a list of JudgeIssue into a numbered plain-text block for the healer prompt.
+
+    Args:
+        issues: The problems flagged by the judge, each with a category
+            (e.g. "language", "faithfulness") and a description of what's wrong.
+
+    Returns:
+        A newline-separated, 1-indexed list like:
+        "1. [Language] Dialogue is in English, expected Italian."
+        Returns an empty string if issues is empty.
+    """
+    formatted_issues: list[str] = []
+
+    for i, issue in enumerate(issues, 1):
+        # Capitalized category as a visual tag, so the healer can scan
+        # issues by type at a glance instead of reading each one in full.
+        formatted = f"{i}. [{issue.category.capitalize()}] {issue.issue}"
+        formatted_issues.append(formatted)
+
+    return "\n".join(formatted_issues)
 
 def _format_intent(intent: Union[Quest, Dialogue]) -> str:
     """Format a conversation intent (Quest or Dialogue) into key-value prompt lines.

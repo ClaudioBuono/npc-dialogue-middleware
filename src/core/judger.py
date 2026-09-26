@@ -1,15 +1,14 @@
 from __future__ import annotations
-import json
-from typing import Any
-
+from pprint import pprint 
 from pydantic import ValidationError
 from api.schemas import ComposedDialogue
 from core.config.settings import Settings
 from core.contract_builder import ContractBuilder
+from core.helpers.formatters import to_json_format
 from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode, PreProcessingError, ValidationErrorCode
 from core.types.contexts import GameContext, NPCContext
-from core.types.dataclasses import Contract, JudgeIssue, JudgeOutput, JudgeProblem, JudgeQuestion
+from core.types.dataclasses import JudgeIssue, JudgeOutput, JudgeProblem, JudgeQuestion
 
 
 class Judger:
@@ -35,11 +34,12 @@ class Judger:
         # Build contract
         judge_questions = self._build_questions(Settings().language.name)
         judge_contract = self.contract_builder.build_judge_contract(composed_dialogue, game_context, npc_context, judge_questions)
-
+        print("JUDGE INPUT: ",to_json_format(judge_contract))
         # Parse response and check its validity 
-        judge_output_raw = self._client.generate(judge_contract, temperature = 0.0) # TODO: Test higher temperatures
+        judge_output_raw = self._client.generate(judge_contract, temperature = 0.3) # TODO: Test higher temperatures
         try:
             judge_output = JudgeOutput.model_validate_json(judge_output_raw)
+            print("JUDGE RESULT: ",to_json_format(judge_output))
         except ValidationError as e:
             raise PreProcessingError(code=ValidationErrorCode.INVALID_VALUE, errors=[f"Judge output does not match expected schema: {e}", f"Raw output: {judge_output_raw}"])
         
@@ -52,7 +52,7 @@ class Judger:
         # Build issues array
         issues = self._map_judge_issues(judge_problems)
         static_issues = self._judge_static_format(composed_dialogue, npc_context)
-        return [issues, static_issues]
+        return issues + static_issues
 
     # Helper methods --------------------------------------------------------------------------------
     def _build_questions(self, default_language: str) -> list[JudgeQuestion]:
@@ -94,8 +94,7 @@ class Judger:
             ),
             JudgeQuestion(
                 id="language",
-                text=f"Is the dialogue written in {default_language} or in a language "
-                "consistent with the NPC's allowed languages?",
+                text=f"Is the entire dialogue written in {default_language}, with no other language mixed in?",
             ),
             JudgeQuestion(
                 id="fairness",
@@ -106,6 +105,7 @@ class Judger:
             ),
         ]
 
+    #TODO: refactor to reduce complexity
     def _judge_static_format(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext) -> list[JudgeIssue]:
         """Run deterministic, non-LLM checks on the dialogue's structure.
 
@@ -125,15 +125,17 @@ class Judger:
         """
         issues: list[JudgeIssue] = []
 
-        if not npc_context.intent.must_use_expression in composed_dialogue.dialogue:
+        if npc_context.intent.must_use_expression and ( not npc_context.intent.must_use_expression in composed_dialogue.dialogue):
             issues.append(JudgeIssue(category="Must use expression", issue="Expression is not used in dialogue"))
 
-        if len(composed_dialogue.player_options.dialogue_options) != Settings().number_of_options:
-            issues.append(JudgeIssue(category="Number of options", issue="Incorrect number of options"))
+        if composed_dialogue.player_options and composed_dialogue.player_options.dialogue_options:
+            if len(composed_dialogue.player_options.dialogue_options) != Settings().number_of_options:
+                issues.append(JudgeIssue(category="Number of options", issue="Incorrect number of options"))
 
         if npc_context.intent.has_choice:
-            if not(composed_dialogue.player_options.accept and composed_dialogue.player_options.refuse):
-                issues.append(JudgeIssue(category="Accept/Refuse", issue="Missing Accept/Refuse options"))
+            if composed_dialogue.player_options and composed_dialogue.player_options.accept and composed_dialogue.player_options.refuse:
+                if not(composed_dialogue.player_options.accept and composed_dialogue.player_options.refuse):
+                    issues.append(JudgeIssue(category="Accept/Refuse", issue="Missing Accept/Refuse options"))
 
         return issues
     
@@ -150,10 +152,10 @@ class Judger:
             True if response contains exactly one entry per expected
             question id (regardless of order), False otherwise.
         """
-        if len(response) != len(questions):
+        if len(response.answers) != len(questions):
             return False
 
-        response_ids = {item["id"] for item in response}
+        response_ids = {item.id for item in response.answers}
         expected_ids = {q.id for q in questions}
 
         return response_ids == expected_ids

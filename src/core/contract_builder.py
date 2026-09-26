@@ -1,12 +1,11 @@
 from typing import Any, Dict
 from api.schemas import ComposedDialogue
 from core.config.settings import Settings
-from core.helpers.formatters import format_composed_dialogue, format_dialogue_history, format_game_context, format_judge_questions, format_npc_content
-from core.types.dataclasses import Contract, JudgeQuestion
+from core.helpers.formatters import format_composed_dialogue, format_dialogue_history, format_game_context, format_judge_issues, format_judge_questions, format_npc_content
+from core.types.dataclasses import Contract, JudgeIssue, JudgeQuestion
 from core.types.contexts import *
 from core.llm.prompts import *
 from core.types.contexts import GameContext
-
 
 class ContractBuilder:
     """
@@ -61,30 +60,57 @@ class ContractBuilder:
 
 
     def build_judge_contract(self, composed_dialogue: ComposedDialogue, game_context: GameContext, npc_context: NPCContext, questions: List[JudgeQuestion]) -> Contract:
-            """Build the execution contract for the judge LLM evaluation task.
-    
-            Formats the dialogue, game, and NPC contexts into system and user prompts,
-            and defines the expected JSON schema output for validating dialogue compliance
-            against fixed evaluation rules.
-    
-            Args:
-                composed_dialogue (ComposedDialogue): The composed dialogue instance to be evaluated.
-                game_context (GameContext): The global game state and environment context.
-                npc_context (NPCContext): The NPC profile, personality, and dialogue parameters.
-    
-            Returns:
-                Contract: A Contract instance containing the assembled system prompt, user prompt,
-                and JSON output schema.
-            """
-            system_prompt = self._build_judge_system_prompt()
-            user_prompt = self._build_judge_user_prompt(composed_dialogue, game_context, npc_context, questions)
-            output_schema = self._build_judge_output_schema([q.id for q in questions])
-    
-            return Contract(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                output_schema=output_schema,
-            )
+        """Build the execution contract for the judge LLM evaluation task.
+
+        Formats the dialogue, game, and NPC contexts into system and user prompts,
+        and defines the expected JSON schema output for validating dialogue compliance
+        against fixed evaluation rules.
+
+        Args:
+            composed_dialogue (ComposedDialogue): The composed dialogue instance to be evaluated.
+            game_context (GameContext): The global game state and environment context.
+            npc_context (NPCContext): The NPC profile, personality, and dialogue parameters.
+
+        Returns:
+            Contract: A Contract instance containing the assembled system prompt, user prompt,
+            and JSON output schema.
+        """
+        system_prompt = self._build_judge_system_prompt()
+        user_prompt = self._build_judge_user_prompt(composed_dialogue, game_context, npc_context, questions)
+        output_schema = self._build_judge_output_schema([q.id for q in questions])
+
+        return Contract(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            output_schema=output_schema,
+        )
+
+    def build_healer_contract(self, composed_dialogue: ComposedDialogue, game_context: GameContext, npc_context: NPCContext, issues: List[JudgeIssue]) -> Contract:
+        """Build the execution contract for the healer LLM repair task.
+
+        Formats the dialogue, game and NPC contexts, and the issues flagged by
+        the judge into system and user prompts, and defines the expected JSON
+        schema output for the repaired dialogue.
+
+        Args:
+            composed_dialogue (ComposedDialogue): The dialogue instance to be repaired.
+            game_context (GameContext): The global game state and environment context.
+            npc_context (NPCContext): The NPC profile, personality, and dialogue parameters.
+            issues (List[JudgeIssue]): The problems flagged by the judge that the healer must resolve.
+
+        Returns:
+            Contract: A Contract instance containing the assembled system prompt, user prompt,
+            and JSON output schema.
+        """
+        system_prompt = self._build_healer_system_prompt()
+        user_prompt = self._build_healer_user_prompt(composed_dialogue, game_context, npc_context, issues)
+        output_schema = self._build_output_schema(npc_context)
+
+        return Contract(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            output_schema=output_schema,
+        )
     
 
     # Helper methods for Dialogue prompt -------------------------------------------------------
@@ -381,9 +407,6 @@ class ContractBuilder:
         return "\n\n".join(user_prompt_lines)
 
 
-    from typing import Any
-
-
     def _build_judge_output_schema(self, question_ids: list[str], include_reason: bool = True) -> dict[str, Any]:
         """
         Builds the JSON output schema for the judge dynamically.
@@ -396,20 +419,28 @@ class ContractBuilder:
                 "type": "string",
                 "enum": list(question_ids),
                 "description": "The id of the question being answered."
-            },
-            "answer": {
-                "type": "boolean",
-                "description": "True if the condition holds, False otherwise."
             }
         }
-        item_required = ["id", "answer"]
+        item_required = ["id"]
 
         if include_reason:
             item_properties["reason"] = {
                 "type": "string",
-                "description": "Brief justification for the answer."
+                "description": (
+                    "If answer is false, explain concretely what is wrong so a "
+                    "second editor can fix it without re-reading the "
+                    "full context: quote or point to the specific problematic part "
+                    "of the dialogue, and state what it should say or do instead. "
+                    "If answer is true, a short confirmation is enough."
+                )
             }
             item_required.append("reason")
+
+        item_properties["answer"] = {
+            "type": "boolean",
+            "description": "True if the condition holds, False otherwise."
+        }
+        item_required.append("answer")
 
         item_schema = {
             "type": "object",
@@ -430,3 +461,35 @@ class ContractBuilder:
             "additionalProperties": False
         }
         return schema
+
+    def _build_healer_system_prompt(self) -> str:
+        """
+        Builds the system prompt for the Healer, which includes the base prompt and rules.
+        """
+        system_prompt_lines = [
+            HEALER_BASE_PROMPT,
+            HEALER_RULES_PROMPT,
+        ]
+
+        return "\n\n".join(system_prompt_lines)
+    
+    def _build_healer_user_prompt(self, composed_dialogue: ComposedDialogue, game_context: GameContext, npc_context: NPCContext, issues: list[JudgeIssue]) -> str:
+        """
+        Builds the user prompt for the Healer, which includes the formatted dialogue, game context, NPC context, judge found issues.
+        """
+        formatted_dialogue = format_composed_dialogue(composed_dialogue)
+        formatted_npc_context = format_npc_content(npc_context)
+        formatted_game_context = format_game_context(game_context)
+
+        healer_body_prompt = HEALER_BODY_PROMPT_TEMPLATE.format(
+            npc_context=formatted_npc_context,
+            game_context=formatted_game_context,
+            dialogue=formatted_dialogue,
+        )
+
+        user_prompt_lines = [
+            HEALER_TASK_PROMPT_TEMPLATE.format(issues=format_judge_issues(issues)),
+            healer_body_prompt,
+        ]
+
+        return "\n\n".join(user_prompt_lines)

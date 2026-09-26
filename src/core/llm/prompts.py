@@ -128,10 +128,8 @@ JUDGE_BASE_PROMPT = inspect.cleandoc("""
 
 JUDGE_TASK_PROMPT = inspect.cleandoc("""
     Answer the following questions about the dialogue, using only the game
-    context, NPC context, and dialogue provided below. Answer strictly true
-    or false for each question — do not skip any.
-
-    FIXED QUESTIONS (For all checks: TRUE = Passed / Good, FALSE = Failed / Has Issue):
+    context, NPC context, and dialogue provided below.
+    QUESTIONS:
     {questions}
 """)
 
@@ -151,4 +149,45 @@ JUDGE_RULES_PROMPT = inspect.cleandoc("""
     - First extract the verifiable claims contained in the dialogue.
     - For each one, check whether it is supported by the provided context.
     - Respond EXCLUSIVELY with a JSON object, with no text before or after, in the format indicated below.
+""")
+
+# ---- HEALER ----
+
+HEALER_BASE_PROMPT = inspect.cleandoc("""
+    You are a narrative script doctor for video games.
+    You receive an NPC dialogue line together with a list of specific
+    problems already identified by an automated reviewer, and you rewrite
+    the line to fix ONLY those problems.
+    You don't know who or what generated the original line, and you must
+    not introduce stylistic changes, new claims, or new named entities
+    beyond what is strictly needed to fix the listed problems.
+""")
+ 
+HEALER_TASK_PROMPT_TEMPLATE = inspect.cleandoc("""
+    Rewrite the dialogue below so that every issue listed is resolved,
+    while keeping the NPC's tone, personality, and approximate length
+    unchanged. Do not change anything that is not listed as an issue.
+ 
+    ISSUES TO FIX:
+    {issues}
+""")
+ 
+HEALER_BODY_PROMPT_TEMPLATE = inspect.cleandoc("""
+    THIS IS THE GAME CONTEXT:
+    {game_context}
+ 
+    THIS IS THE NPC CONTEXT:
+    {npc_context}
+ 
+    THIS IS THE DIALOGUE TO REPAIR:
+    {dialogue}
+""")
+ 
+HEALER_RULES_PROMPT = inspect.cleandoc("""
+    RULES:
+    - Change only what is necessary to resolve the listed issues.
+    - Preserve the NPC's persona, tone, and dialogue length as much as possible.
+    - Do not invent new facts, names, or events beyond what the context supports.
+    - Respond EXCLUSIVELY with a JSON object matching the provided schema,
+      with no text before or after.
 """)
