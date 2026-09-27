@@ -192,7 +192,7 @@ class Judger:
         """
         Check if the dialogue includes Accept/Refuse options when required by the NPC's intent.
         """
-        if not npc_context.intent.has_choice:
+        if not getattr(npc_context.intent, "has_choice", False):
             return None
         options = composed_dialogue.player_options
         if not options or not (options.accept and options.refuse):

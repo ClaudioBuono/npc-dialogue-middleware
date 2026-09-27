@@ -332,6 +332,19 @@ def test_judge_static_format_no_choice_required_no_accept_refuse_issue(judger, m
     issues = judger.judge_dialogue(composed_dialogue, npc_ctx, game_ctx)
     assert not any(i.category == "Accept/Refuse" for i in issues)
 
+def test_judge_static_format_dialogue_intent_without_has_choice(judger, mock_client, dummy_contexts, all_true_response):
+    """Regression test: Dialogue (unlike Quest) has no has_choice field.
+    _check_accept_refuse must not raise AttributeError when npc_context.intent
+    is a plain Dialogue -- it should simply treat it as "no choice required"."""
+    game_ctx, npc_ctx = dummy_contexts
+    npc_ctx.intent = Dialogue()  # no has_choice field on this type
+    composed_dialogue = ComposedDialogue(intent=Dialogue(), dialogue="Just some flavor text")
+
+    mock_client.generate.return_value = all_true_response
+
+    issues = judger.judge_dialogue(composed_dialogue, npc_ctx, game_ctx)
+    assert not any(i.category == "Accept/Refuse" for i in issues)
+
 def test_judge_dialogue_combines_semantic_and_static_issues(judger, mock_client, dummy_contexts):
     """When both an LLM-detected issue and a static-format violation occur,
     both must be present in the result (judge_dialogue must not drop either)."""
@@ -357,4 +370,3 @@ def test_judge_dialogue_combines_semantic_and_static_issues(judger, mock_client,
     assert len(issues) == 2
     categories = {i.category for i in issues}
     assert categories == {"entity_check", "Must use expression"}
-    
