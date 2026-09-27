@@ -104,40 +104,6 @@ class Judger:
                 "NPC's established persona or narrative role?",
             ),
         ]
-
-    #TODO: refactor to reduce complexity
-    def _judge_static_format(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext) -> list[JudgeIssue]:
-        """Run deterministic, non-LLM checks on the dialogue's structure.
-
-        Verifies formatting rules that don't require semantic judgment: use
-        of the NPC's mandatory expression, the expected number of player
-        dialogue options, and the presence of accept/refuse options when
-        the NPC's intent requires a choice.
-
-        Args:
-            composed_dialogue: The generated dialogue to check.
-            npc_context: Contextual information about the NPC, including
-                its intent and required expression.
-
-        Returns:
-            A list of JudgeIssue instances for each static rule violated.
-            Empty if no violations are found.
-        """
-        issues: list[JudgeIssue] = []
-
-        if npc_context.intent.must_use_expression and ( not npc_context.intent.must_use_expression in composed_dialogue.dialogue):
-            issues.append(JudgeIssue(category="Must use expression", issue="Expression is not used in dialogue"))
-
-        if composed_dialogue.player_options and composed_dialogue.player_options.dialogue_options:
-            if len(composed_dialogue.player_options.dialogue_options) != Settings().number_of_options:
-                issues.append(JudgeIssue(category="Number of options", issue="Incorrect number of options"))
-
-        if npc_context.intent.has_choice:
-            if composed_dialogue.player_options and composed_dialogue.player_options.accept and composed_dialogue.player_options.refuse:
-                if not(composed_dialogue.player_options.accept and composed_dialogue.player_options.refuse):
-                    issues.append(JudgeIssue(category="Accept/Refuse", issue="Missing Accept/Refuse options"))
-
-        return issues
     
     def _check_valid_response(self, response: list[JudgeOutput], questions: list[JudgeQuestion]) -> bool:
         """Check that the judge's response covers exactly the expected questions.
@@ -177,3 +143,58 @@ class Judger:
             issues.append(JudgeIssue(category=problem.id, issue=problem.reason))
 
         return issues
+
+    def _judge_static_format(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext) -> list[JudgeIssue]:
+        """Run deterministic, non-LLM checks on the dialogue's structure.
+
+        Verifies formatting rules that don't require semantic judgment: use
+        of the NPC's mandatory expression, the expected number of player
+        dialogue options, and the presence of accept/refuse options when
+        the NPC's intent requires a choice.
+
+        Args:
+            composed_dialogue: The generated dialogue to check.
+            npc_context: Contextual information about the NPC, including
+                its intent and required expression.
+
+        Returns:
+            A list of JudgeIssue instances for each static rule violated.
+            Empty if no violations are found.
+        """
+        checks = (
+            self._check_mandatory_expression(composed_dialogue, npc_context),
+            self._check_option_count(composed_dialogue),
+            self._check_accept_refuse(composed_dialogue, npc_context),
+        )
+        return [issue for issue in checks if issue is not None]
+
+    def _check_mandatory_expression(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext) -> JudgeIssue | None:
+        """
+        Check if the NPC's mandatory expression is used in the dialogue.
+        """
+        expression = npc_context.intent.must_use_expression
+        if expression and expression not in composed_dialogue.dialogue:
+            return JudgeIssue(category="Must use expression", issue="Expression is not used in dialogue")
+        return None
+
+    def _check_option_count(self, composed_dialogue: ComposedDialogue) -> JudgeIssue | None:
+        """
+        Check if the number of player options in the dialogue matches the expected number.
+        """
+        options = composed_dialogue.player_options
+        if not options or not options.dialogue_options:
+            return None
+        if len(options.dialogue_options) != Settings().number_of_options:
+            return JudgeIssue(category="Number of options", issue="Incorrect number of options")
+        return None
+
+    def _check_accept_refuse(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext) -> JudgeIssue | None:
+        """
+        Check if the dialogue includes Accept/Refuse options when required by the NPC's intent.
+        """
+        if not npc_context.intent.has_choice:
+            return None
+        options = composed_dialogue.player_options
+        if not options or not (options.accept and options.refuse):
+            return JudgeIssue(category="Accept/Refuse", issue="Missing Accept/Refuse options")
+        return None
