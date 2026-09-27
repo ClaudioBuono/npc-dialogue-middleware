@@ -3,6 +3,7 @@ import logging
 from api.schemas import ComposedDialogue
 from core.healer import Healer
 from core.judger import Judger
+from core.refiner import Refiner
 from core.state_manager import StateManager
 from core.config.settings import Settings
 from core.contract_builder import ContractBuilder
@@ -44,7 +45,7 @@ class Orchestrator:
         llm_router: LLMRouter,
         dialogue_generator: DialogueGenerator,
         dialogue_composer: DialogueOutputComposer,
-        judger: Judger
+        refiner: Refiner,
     ) -> None:
         if self._initialized:
             return
@@ -55,10 +56,9 @@ class Orchestrator:
         self.dialogue_composer = dialogue_composer
         self.dialogue_history = dialogue_history
         self.guardrail = guardrail
-        self.judger = judger
+        self.refiner = refiner
 
         self.game_context: GameContext | None = None
-
 
         self._iterations = 0
         self._initialized = True
@@ -96,7 +96,6 @@ class Orchestrator:
             
         StateManager().transition_to(MiddlewareState.GENERATING)
 
-        self._iterations += 1
 
         if last_player_choice:
             self.dialogue_history.add_player_dialogue_to_history(last_player_choice)
@@ -109,26 +108,15 @@ class Orchestrator:
         logger.debug(f"Selected LLM client: {type(client).__name__}")
 
         self.dialogue_generator.set_client(client)
-        self.judger.set_client(client)
         raw_dialogue: str = self.dialogue_generator.generate(contract)
 
         composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, raw_dialogue)
 
-        issues = self.judger.judge_dialogue(composed_dialogue, npc_context, self.game_context)
-        
-        print("COMPOSED DIALOGUE: ", composed_dialogue)
+        self.refiner.set_client(client)
 
-        if len(issues) > 0:
+        composed_dialogue = self.refiner.refine_dialogue(composed_dialogue, npc_context, self.game_context)
 
-            print("FOUND ISSUES: ", issues)
-            healer: Healer = Healer(contract_builder=self.contract_builder, dialogue_composer=self.dialogue_composer)
-            healer.set_client(client)
-
-            healed_composed_dialogue: ComposedDialogue = healer.heal_dialogue(composed_dialogue, self.game_context, npc_context, issues)
-
-            print("HEAL DIALOGUE: ", healed_composed_dialogue)
-
-
+        # TODO: Integrate in refiner?
         if Settings().profanity_mode != ProfanityMode.DISABLED:
             valid_output: bool = self.guardrail.validate_composed_output(composed_dialogue)
 
@@ -148,7 +136,7 @@ class Orchestrator:
         return composed_dialogue
 
     
-
+    # TODO: Refactor to reduce complexity
     def generate_dialogue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
         """Generate NPC dialogue using the NPC and game context via streaming."""
 

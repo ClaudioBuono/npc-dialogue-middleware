@@ -25,7 +25,8 @@ class AppSettings(BaseModel):
     prompt_fairness_filter: bool = True
     number_of_options: int = 2
     profanity_mode: ProfanityMode = ProfanityMode.STOP
-    censor_word: str = "[CENSORED]" #TODO: change from api route
+    censor_word: str = "[CENSORED]"
+    refiner_max_iterations: int = 3
 
 
 class Settings:
@@ -231,6 +232,20 @@ class Settings:
         cls._settings.censor_word = censor_word
         logger.info(
             f"Censor word updated: {censor_word}"
+        )
+
+    @classmethod
+    def update_refiner_max_iterations(cls, max_iterations: int) -> None:
+        """Updates the refiner max iterations setting, loading defaults first if needed.
+        
+        Args:
+            max_iterations: The new refiner max iterations.
+        """
+        if cls._settings is None:
+            cls()  # force loading with defaults
+        cls._settings.refiner_max_iterations = max_iterations
+        logger.info(
+            f"Refiner max iterations updated: {max_iterations}"
         )
     
     @classmethod

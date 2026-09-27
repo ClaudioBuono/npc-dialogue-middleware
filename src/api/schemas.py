@@ -89,10 +89,9 @@ class CensorWordRequest(BaseModel):
     """Request body for updating the word used to censor filtered content."""
     word: str = Field(..., min_length=1, max_length=32, description="The replacement word used for censoring filtered content.")
 
-class NumberOfOptionsRequest(BaseModel):
-    """Request body for setting the number of dialogue options generated per turn."""
-    # At least 1 option must always be available
-    value: int = Field(..., ge=1, description="Number of player response options to generate.")
+class IntegerRequest(BaseModel):
+    """Request body for setting an integer value"""
+    value: int = Field(..., ge=1, description="A positive integer number to choose from.")
 
 class SettingsUpdatedResponse(BaseModel):
     """Generic confirmation payload returned by settings-update endpoints."""

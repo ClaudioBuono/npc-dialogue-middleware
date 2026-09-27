@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from api.errors import MIDDLEWARE_ERROR_RESPONSES
 from core.config.settings import Settings, AppSettings, LLMSettings
-from api.schemas import CensorWordRequest, LanguageRequest, ProfanityModeRequest, ToggleRequest, NumberOfOptionsRequest, SettingsUpdatedResponse
+from api.schemas import CensorWordRequest, LanguageRequest, ProfanityModeRequest, ToggleRequest, IntegerRequest, SettingsUpdatedResponse
 from core.orchestrator import Orchestrator
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 
@@ -46,7 +46,7 @@ def toggle_prompt_fairness_filter(request: ToggleRequest):
     description="Sets how many player response options are generated per dialogue turn.",
     responses={200: {"description": "Number of options updated successfully."}},
 )
-def set_number_of_options(request: NumberOfOptionsRequest):
+def set_number_of_options(request: IntegerRequest):
     Settings().set_number_of_options(request.value)
     return {"status": "ok"}
 
@@ -92,4 +92,18 @@ def update_censor_word(request: CensorWordRequest):
         )
     
     Settings().update_censor_word(censor_word)
+    return {"status": "ok"}
+
+
+@router.post(
+    "/refiner-max-iterations",
+    response_model=SettingsUpdatedResponse,
+    summary="Update Refiner max iterations number",
+    description="Updates the number of iterations the refiner will perform.",
+    responses={
+        200: {"description": "Refiner max iterations number updated successfully."},
+    },
+)
+def update_refiner_max_iterations(request: IntegerRequest):
+    Settings().update_refiner_max_iterations(request.value)
     return {"status": "ok"}

@@ -1,7 +1,9 @@
 from core.contract_builder import ContractBuilder
 from core.dialogue_generator import DialogueGenerator
 from core.guardrail import Guardrail
+from core.healer import Healer
 from core.judger import Judger
+from core.refiner import Refiner
 from core.routing.router import LLMRouter
 from core.tools.history import DialogueHistory
 from core.orchestrator import Orchestrator
@@ -19,7 +21,8 @@ def build_orchestrator() -> Orchestrator:
     dialogue_composer = DialogueOutputComposer()
     dialogue_history = DialogueHistory()
     guardrail = Guardrail()
-    judger = Judger(contract_builder)
+    refiner = build_refiner(contract_builder=contract_builder, dialogue_composer=dialogue_composer)
+
 
     orchestrator = Orchestrator(
         contract_builder = contract_builder,
@@ -28,7 +31,7 @@ def build_orchestrator() -> Orchestrator:
         dialogue_composer = dialogue_composer,
         dialogue_history = dialogue_history,
         guardrail = guardrail,
-        judger = judger
+        refiner = refiner
     )
     return orchestrator
 
@@ -41,4 +44,18 @@ def build_generate_service(orchestrator: Orchestrator) -> GenerateService:
         orchestrator=orchestrator,
         guardrail=orchestrator.guardrail,
         dialogue_history=orchestrator.dialogue_history,
+    )
+
+def build_refiner(contract_builder: ContractBuilder, dialogue_composer: DialogueOutputComposer) -> Refiner:
+    """
+    Builds the Refiner.
+    """
+
+    healer: Healer = Healer(contract_builder, dialogue_composer)
+    judger: Judger = Judger(contract_builder)
+
+
+    return Refiner(
+        healer=healer,
+        judger=judger
     )
