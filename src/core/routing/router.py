@@ -1,7 +1,7 @@
 import logging
 from typing import List
-from core.config import thresholds
-from core.config.thresholds import HIGH_THRESHOLD, LOW_THRESHOLD
+from core.configuration import thresholds
+from core.configuration.thresholds import HIGH_THRESHOLD, LOW_THRESHOLD
 from core.routing.complexity_analyzer import ComplexityAnalyzer, ComplexityScore
 from core.routing.registry import ModelRegistry
 from core.routing.profiler import RankedModel

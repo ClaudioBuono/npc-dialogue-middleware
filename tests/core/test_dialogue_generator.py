@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from core.config.settings import Settings
+from core.configuration.settings import Settings
 from core.dialogue_generator import DialogueGenerator
 from core.types.dataclasses import Contract
 from core.llm.openai_client import OpenAICompatibleClient

@@ -2,7 +2,7 @@ import logging
 import re
 from threading import Lock
 import time
-from core.config.settings import Settings
+from core.configuration.settings import Settings
 from core.types.contexts import GameContext, NPCContext
 from core.types.enums import Language
 from core.tools.lexicon_scanner import FastLexiconScanner, StreamingLexiconScanner

@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import MagicMock
 from api.schemas import ComposedDialogue, QuestChoiceSchema
-from core.config.settings import Settings
-from core.contract_builder import ContractBuilder
-from core.judger import Judger
+from core.configuration.settings import Settings
+from core.generation.contract_builder import ContractBuilder
+from core.pipeline.judger import Judger
 from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.errors import PreProcessingError, MiddlewareError, MiddlewareErrorCode, ValidationErrorCode
 from core.types.contexts import Dialogue, GameContext, NPCContext, Quest

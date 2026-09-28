@@ -2,11 +2,9 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from api.dependencies import get_generate_service
 from api.handlers import MIDDLEWARE_ERROR_STATUS_MAP
-from core.config.settings import Settings
-from core.generate_service import GenerateService
-from core.state_manager import StateManager
-from core.orchestrator import Orchestrator
-from core.tools import pre_processing
+from core.configuration.settings import Settings
+from core.generation.generate_service import GenerateService
+from core.infrastructure.state_manager import StateManager
 from core.types.contexts import GameContext, NPCContext
 from api.schemas import ComposedDialogue, DialogueStreamRequest, MiddlewareStatusResponse
 from api.errors import ALL_ERROR_RESPONSES, MIDDLEWARE_ERROR_RESPONSES, PREPROCESSING_ERROR_RESPONSES, ROUTING_CONFIG_ERROR_RESPONSES, error_responses

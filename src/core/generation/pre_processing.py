@@ -1,6 +1,6 @@
 import logging
 from typing import Optional
-from core.config.thresholds import *
+from core.configuration.thresholds import *
 from core.types.contexts import GameContext, Dialogue, NPCContext, Quest
 from core.tools.errors import PreProcessingError, ValidationErrorCode
 

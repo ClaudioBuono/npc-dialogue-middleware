@@ -1,7 +1,7 @@
 from api.schemas import ComposedDialogue
-from core.config.settings import Settings
-from core.healer import Healer
-from core.judger import Judger
+from core.configuration.settings import Settings
+from core.pipeline.healer import Healer
+from core.pipeline.judger import Judger
 from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 from core.types.contexts import GameContext, NPCContext
@@ -61,7 +61,7 @@ class Refiner:
         """
         current_dialogue: ComposedDialogue = composed_dialogue
 
-        for i in range(self.max_iterations):
+        for _ in range(self.max_iterations):
             issues: list[JudgeIssue] = self.judger.judge_dialogue(current_dialogue, npc_context, game_context)
 
             if len(issues) == 0:

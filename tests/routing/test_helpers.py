@@ -1,7 +1,7 @@
 import pytest
 from core.routing.helpers import classify_score_to_complexity_tier
 from core.types.enums import ComplexityTier
-from core.config.thresholds import LOW_THRESHOLD, HIGH_THRESHOLD
+from core.configuration.thresholds import LOW_THRESHOLD, HIGH_THRESHOLD
 
 def test_classify_score_to_complexity_tier():
     # LOW threshold is 0.35, HIGH threshold is 0.7

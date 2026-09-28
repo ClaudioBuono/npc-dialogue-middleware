@@ -3,9 +3,9 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel, ValidationError
 
 from api.schemas import ComposedDialogue
-from core.config.settings import Settings
-from core.contract_builder import ContractBuilder
-from core.healer import Healer
+from core.configuration.settings import Settings
+from core.generation.contract_builder import ContractBuilder
+from core.pipeline.healer import Healer
 from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.errors import PreProcessingError, ValidationErrorCode
 from core.tools.output_composer import DialogueOutputComposer

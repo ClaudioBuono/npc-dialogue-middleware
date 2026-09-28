@@ -1,6 +1,6 @@
 import logging
 from typing import List, Optional
-from core.config.settings import Settings
+from core.configuration.settings import Settings
 from core.routing.models import ModelConfig, load_config_from_file
 from core.routing.profiler import BaseProfiler, SelfAssessmentProfiler, BenchmarkProfiler, RankedModel, build_client, _TIER_TO_SCORE
 from core.types.enums import ComplexityTier

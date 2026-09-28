@@ -16,7 +16,7 @@ if _SRC_DIR.exists() and str(_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(_SRC_DIR))
 
 import core.helpers.paths
-from core.config.settings import Settings
+from core.configuration.settings import Settings
 from core.routing.registry import ModelRegistry
 
 

@@ -1,6 +1,6 @@
 from typing import Any, Dict
 from api.schemas import ComposedDialogue
-from core.config.settings import Settings
+from core.configuration.settings import Settings
 from core.helpers.formatters import format_composed_dialogue, format_dialogue_history, format_game_context, format_judge_issues, format_judge_questions, format_npc_content
 from core.types.dataclasses import Contract, JudgeIssue, JudgeQuestion
 from core.types.contexts import *

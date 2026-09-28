@@ -2,7 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
-from core.config.thresholds import CHARS_PER_TOKEN
+from core.configuration.thresholds import CHARS_PER_TOKEN
 from core.routing.helpers import classify_score_to_complexity_tier
 from core.routing.models import ModelConfig
 from core.llm.llm_base_client import BaseLLMClient

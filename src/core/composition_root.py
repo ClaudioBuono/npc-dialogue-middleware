@@ -1,14 +1,14 @@
-from core.contract_builder import ContractBuilder
-from core.dialogue_generator import DialogueGenerator
-from core.guardrail import Guardrail
-from core.healer import Healer
-from core.judger import Judger
-from core.refiner import Refiner
+from core.generation.contract_builder import ContractBuilder
+from core.generation.dialogue_generator import DialogueGenerator
+from core.pipeline.guardrail import Guardrail
+from core.pipeline.healer import Healer
+from core.pipeline.judger import Judger
+from core.pipeline.refiner import Refiner
 from core.routing.router import LLMRouter
-from core.tools.history import DialogueHistory
-from core.orchestrator import Orchestrator
-from core.generate_service import GenerateService
-from core.tools.output_composer import DialogueOutputComposer
+from core.generation.history import DialogueHistory
+from core.pipeline.orchestrator import Orchestrator
+from core.generation.generate_service import GenerateService
+from core.generation.output_composer import DialogueOutputComposer
 
 
 def build_orchestrator() -> Orchestrator:

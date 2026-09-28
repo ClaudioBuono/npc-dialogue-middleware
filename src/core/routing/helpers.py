@@ -1,4 +1,5 @@
-from core.config.thresholds import HIGH_THRESHOLD, LOW_THRESHOLD
+
+from core.configuration.thresholds import HIGH_THRESHOLD, LOW_THRESHOLD
 from core.types.enums import ComplexityTier
 
 

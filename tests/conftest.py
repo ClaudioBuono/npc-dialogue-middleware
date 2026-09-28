@@ -1,6 +1,6 @@
 from pathlib import Path
 import pytest
-from core.config.settings import Settings
+from core.configuration.settings import Settings
 import core.helpers.paths
 
 @pytest.fixture(scope="session", autouse=True)

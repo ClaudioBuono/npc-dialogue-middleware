@@ -1,12 +1,12 @@
-from typing import Iterator, Optional
 import logging
+from typing import Iterator, Optional
 from api.schemas import ComposedDialogue
-from core.orchestrator import Orchestrator
-from core.guardrail import Guardrail
-from core.tools.history import DialogueHistory
-from core.state_manager import StateManager
-from core.config.settings import Settings
-from core.tools import pre_processing
+from core.generation import pre_processing
+from core.pipeline.orchestrator import Orchestrator
+from core.pipeline.guardrail import Guardrail
+from core.generation.history import DialogueHistory
+from core.infrastructure.state_manager import StateManager
+from core.configuration.settings import Settings
 from core.types.contexts import GameContext, NPCContext
 from core.types.enums import MiddlewareState, ProfanityMode
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode

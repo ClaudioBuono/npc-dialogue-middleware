@@ -1,20 +1,20 @@
 import argparse
 import logging
+import uvicorn
 from pathlib import Path
 from fastapi import FastAPI
-import uvicorn
 from api import generate, settings
 from contextlib import asynccontextmanager
 from api.handlers import register_exception_handlers
 from core.composition_root import build_generate_service, build_orchestrator
+from core.configuration.settings import Settings
 from core.helpers.formatters import to_json_format
-from core.state_manager import StateManager
+from core.infrastructure.state_manager import StateManager
 from core.helpers.logger import setup_logging
-from core.config.settings import Settings
-from core.orchestrator import Orchestrator
+from core.pipeline.orchestrator import Orchestrator
 from core.helpers.paths import get_base_path
 from core.routing.registry import ModelRegistry
-from core.telemetry import TelemetryStore
+from core.infrastructure.telemetry import TelemetryStore
 from core.types.contexts import *
 from core.types.enums import MiddlewareState
 

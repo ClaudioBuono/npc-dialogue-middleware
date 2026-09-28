@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 from api.errors import MIDDLEWARE_ERROR_RESPONSES
-from core.config.settings import Settings, AppSettings, LLMSettings
 from api.schemas import CensorWordRequest, LanguageRequest, ProfanityModeRequest, ToggleRequest, IntegerRequest, SettingsUpdatedResponse
-from core.orchestrator import Orchestrator
+from core.configuration.settings import AppSettings, LLMSettings, Settings
+from core.pipeline.orchestrator import Orchestrator
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 
 router = APIRouter(prefix="/settings", tags=["settings"])

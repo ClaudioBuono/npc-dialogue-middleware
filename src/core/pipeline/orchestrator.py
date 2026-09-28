@@ -1,17 +1,15 @@
 from typing import Any, Optional, Iterator
 import logging
 from api.schemas import ComposedDialogue
-from core.healer import Healer
-from core.judger import Judger
-from core.refiner import Refiner
-from core.state_manager import StateManager
-from core.config.settings import Settings
-from core.contract_builder import ContractBuilder
-from core.dialogue_generator import DialogueGenerator
-from core.guardrail import Guardrail
-from core.tools.history import DialogueHistory
+from core.pipeline.refiner import Refiner
+from core.infrastructure.state_manager import StateManager
+from core.configuration.settings import Settings
+from core.generation.contract_builder import ContractBuilder
+from core.generation.dialogue_generator import DialogueGenerator
+from core.pipeline.guardrail import Guardrail
+from core.generation.history import DialogueHistory
 from core.llm.openai_client import OpenAICompatibleClient
-from core.tools.output_composer import DialogueOutputComposer
+from core.generation.output_composer import DialogueOutputComposer
 from core.routing.router import LLMRouter
 from core.helpers.formatters import to_json_format
 from core.types.contexts import Dialogue, GameContext, NPCContext

@@ -2,8 +2,8 @@ from __future__ import annotations
 from pprint import pprint 
 from pydantic import ValidationError
 from api.schemas import ComposedDialogue
-from core.config.settings import Settings
-from core.contract_builder import ContractBuilder
+from core.configuration.settings import Settings
+from core.generation.contract_builder import ContractBuilder
 from core.helpers.formatters import to_json_format
 from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode, PreProcessingError, ValidationErrorCode

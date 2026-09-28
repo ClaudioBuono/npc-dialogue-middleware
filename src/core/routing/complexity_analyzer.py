@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from types import ModuleType
 from typing import get_args, get_origin, Union
 from pydantic import BaseModel
-from core.config.thresholds import CHARS_PER_TOKEN, HIGH_THRESHOLD, LOW_THRESHOLD
+from core.configuration.thresholds import CHARS_PER_TOKEN, HIGH_THRESHOLD, LOW_THRESHOLD
 from core.helpers.formatters import to_json_format
 from core.routing.helpers import classify_score_to_complexity_tier
 from core.types.contexts import GameContext, NPCContext, Quest, Dialogue

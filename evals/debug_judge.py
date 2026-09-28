@@ -15,7 +15,7 @@ if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
 # actual module path in your project being different -- fix the path
 # here directly, this file has no other layer to hide the fix in.
 import core.helpers.paths
-from core.config.settings import Settings
+from core.configuration.settings import Settings
 from core.routing.registry import ModelRegistry
 from core.composition_root import build_orchestrator
 from core.types.contexts import GameContext, NPCContext, Quest, Dialogue

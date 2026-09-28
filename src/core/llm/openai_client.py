@@ -11,8 +11,7 @@ from openai import (
     APITimeoutError,
     APIStatusError,
 )
-from core.helpers.formatters import to_json_format
-from core.telemetry import TelemetryRecorder
+from core.infrastructure.telemetry import TelemetryRecorder
 from core.types.dataclasses import Contract
 from core.llm.llm_base_client import BaseLLMClient
 from core.tools.errors import LLMClientError, LLMClientErrorCode

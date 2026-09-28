@@ -1,6 +1,6 @@
 import logging
 from typing import Iterator
-from core.config.settings import Settings
+from core.configuration.settings import Settings
 from core.llm.openai_client import OpenAICompatibleClient
 from core.types.dataclasses import Contract
 logger = logging.getLogger(__name__)

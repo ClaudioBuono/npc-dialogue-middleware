@@ -1,11 +1,12 @@
 from __future__ import annotations
 from pydantic import ValidationError
 from api.schemas import ComposedDialogue
-from core.config.settings import Settings
-from core.contract_builder import ContractBuilder
+from core.configuration.settings import Settings
+from core.generation.contract_builder import ContractBuilder
+from core.generation.output_composer import DialogueOutputComposer
 from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.errors import PreProcessingError, ValidationErrorCode
-from core.tools.output_composer import DialogueOutputComposer
+from core.tools.errors import PreProcessingError
 from core.types.contexts import GameContext, NPCContext
 from core.types.dataclasses import JudgeIssue
 
@@ -68,7 +69,7 @@ class Healer:
             # never silently reaches the rest of the pipeline.
             composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, healer_output_raw)
 
-        except ValidationError as e:
+        except ValPreProcessingError:
             raise PreProcessingError(code=ValidationErrorCode.INVALID_VALUE, errors=[f"Healer output does not match expected schema: {e}", f"Raw output: {healer_output_raw}"])
 
         return composed_dialogue

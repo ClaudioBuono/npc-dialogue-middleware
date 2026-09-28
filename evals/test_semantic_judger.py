@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import pytest
 from core.composition_root import build_orchestrator
-from core.orchestrator import Orchestrator
+from core.pipeline.orchestrator import Orchestrator
 from core.types.dataclasses import JudgeIssue
 from .cases import GOLDEN_CASES, METAMORPHIC_PAIRS, EvalCase
 
