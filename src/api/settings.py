@@ -2,8 +2,6 @@ from fastapi import APIRouter
 from api.errors import MIDDLEWARE_ERROR_RESPONSES
 from api.schemas import CensorWordRequest, LanguageRequest, ProfanityModeRequest, ToggleRequest, IntegerRequest, SettingsUpdatedResponse
 from core.configuration.settings import AppSettings, LLMSettings, Settings
-from core.pipeline.orchestrator import Orchestrator
-from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -85,12 +83,8 @@ def update_profanity_mode_settings(request: ProfanityModeRequest):
 )
 def update_censor_word(request: CensorWordRequest):
     censor_word: str = request.word
-    if not Orchestrator().guardrail.validate_censor_word(censor_word): # TODO: find a better way to do it
-        raise MiddlewareError(
-            code=MiddlewareErrorCode.REFUSED,
-            errors=["The provided censor word is itself a banned word."],
-        )
-    
+
+    # TODO: Check for fairness in Settings
     Settings().update_censor_word(censor_word)
     return {"status": "ok"}
 

@@ -1,9 +1,12 @@
 import logging
-from pydantic import BaseModel, Field
+import os
+import tempfile
 from pathlib import Path
-from threading import Lock
+from threading import RLock
+
 import yaml
 from blinker import Signal
+from pydantic import BaseModel, Field
 
 from core.helpers.paths import resolve_config_file
 from core.types.enums import Language, ProfanityMode
@@ -32,16 +35,18 @@ class AppSettings(BaseModel):
 
 class Settings:
     """Singleton that loads the application configuration from a YAML file
-    and exposes its attributes directly, e.g. Settings().profanity_filter
+    and exposes its attributes directly, e.g. Settings().profanity_mode
 
     Settings.configure(config_dir) must be called once, at application
     startup (main.py), before any other access to Settings().
+
+    Every setter persists the change to disk automatically.
     """
 
     SETTINGS_FILENAME = "settings.yaml"
 
     _instance: "Settings | None" = None
-    _lock: Lock = Lock()
+    _lock: RLock = RLock()
     _settings: AppSettings | None = None
     _config_dir: Path | None = None
 
@@ -49,12 +54,6 @@ class Settings:
     language_changed = Signal("language-changed")
 
     def __new__(cls):
-        """Return the existing singleton instance, or create and load it
-        on first access.
-
-        Raises:
-            RuntimeError: If configure() has not been called yet.
-        """
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -68,15 +67,6 @@ class Settings:
         return cls._instance
 
     def _load(self, path: Path) -> None:
-        """Load configuration from disk and validate it against AppSettings.
-
-        Args:
-            path: Full path to the settings.yaml file to load.
-
-        Raises:
-            IsADirectoryError: If path points to a directory instead of a file.
-            FileNotFoundError: If the settings file does not exist.
-        """
         path = resolve_config_file(path.parent, path.name)
         if path.is_dir():
             raise IsADirectoryError(
@@ -87,21 +77,10 @@ class Settings:
         with open(path, "r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
         settings = AppSettings(**raw)
-
-        print("SETT: ", settings)
-
+        logger.debug("Settings loaded from %s: %s", path, settings)
         type(self)._settings = settings
 
     def __getattr__(self, item):
-        """Delegate attribute access to the loaded AppSettings instance.
-
-        Called only if the attribute is not found on the Settings instance
-        itself, so it forwards lookups like .language or .profanity_filter
-        to the underlying validated config.
-
-        Raises:
-            AttributeError: If the loaded settings have no such attribute.
-        """
         settings = type(self)._settings
         if settings is not None and hasattr(settings, item):
             return getattr(settings, item)
@@ -109,14 +88,6 @@ class Settings:
 
     @classmethod
     def configure(cls, config_dir: str | Path) -> None:
-        """Set the config directory. Must be called once, before any Settings().
-
-        Args:
-            config_dir: Path to the folder containing settings.yaml.
-
-        Raises:
-            RuntimeError: If Settings has already been instantiated.
-        """
         with cls._lock:
             if cls._instance is not None:
                 raise RuntimeError("Settings already instantiated: configure() must be called first")
@@ -124,14 +95,6 @@ class Settings:
 
     @classmethod
     def reload(cls) -> "Settings":
-        """Force a reload from disk, using the already configured directory.
-
-        Returns:
-            Settings: The freshly reloaded singleton instance.
-
-        Raises:
-            RuntimeError: If configure() was never called.
-        """
         if cls._config_dir is None:
             raise RuntimeError("Settings.configure(config_dir) was never called")
         with cls._lock:
@@ -143,120 +106,112 @@ class Settings:
     def save(cls, config_dir: str | Path | None = None) -> None:
         """Persist the current settings back to a YAML file on disk.
 
+        The write is atomic: data goes to a temp file first, then replaces
+        the target, so a crash mid-write cannot corrupt settings.yaml.
+
         Args:
             config_dir: Optional target directory. Defaults to the
                 directory configured via configure().
         """
+        with cls._lock:
+            if cls._settings is None:
+                cls()
+            target_dir = Path(config_dir) if config_dir else cls._config_dir
+            target_dir.mkdir(parents=True, exist_ok=True)
+            path = target_dir / cls.SETTINGS_FILENAME
+            data = cls._settings.model_dump(mode="json")
+
+            fd, tmp_name = tempfile.mkstemp(dir=target_dir, suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
+                os.replace(tmp_name, path)  # atomico
+            except Exception:
+                Path(tmp_name).unlink(missing_ok=True)
+                raise
+
+    @classmethod
+    def _persist(cls) -> None:
+        """Save to disk without letting an I/O error crash the caller.
+
+        The in-memory change is already applied; if writing fails we log
+        the error so the app keeps working with the new value.
+        """
+        try:
+            cls.save()
+        except Exception:
+            logger.exception("Failed to persist settings to disk")
+
+    @classmethod
+    def _ensure_loaded(cls) -> None:
         if cls._settings is None:
-            cls()  # force loading with defaults first
-        target_dir = Path(config_dir) if config_dir else cls._config_dir
-        target_dir.mkdir(parents=True, exist_ok=True)
-        path = target_dir / cls.SETTINGS_FILENAME
-        # mode="json" ensures enums, Path, etc. are serialized as plain values
-        data = cls._settings.model_dump(mode="json")
-        with open(path, "w", encoding="utf-8") as f:
-            yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
+            cls()  # force loading
 
     @classmethod
     def change_language(cls, language: Language) -> None:
-        """Update the active language, loading defaults first if needed.
-
-        Args:
-            language: The new language to set.
-        """
-        if cls._settings is None:
-            cls()  # force loading with defaults
-        cls._settings.language = language
+        """Update the active language and persist it."""
+        with cls._lock:
+            cls._ensure_loaded()
+            cls._settings.language = language
+            cls._persist()
         logger.info(f"Language changed to {language.index}")
         cls.language_changed.send(cls, language=language)
 
     @classmethod
     def toggle_prompt_fairness_filter(cls, flag: bool) -> None:
-        """Enable or disable the prompt fairness filter, loading defaults first if needed.
-
-        Args:
-            flag: True to enable the prompt fairness filter, False to disable it.
-        """
-        if cls._settings is None:
-            cls()  # force loading with defaults
-        cls._settings.prompt_fairness_filter = flag
+        """Enable or disable the prompt fairness filter and persist it."""
+        with cls._lock:
+            cls._ensure_loaded()
+            cls._settings.prompt_fairness_filter = flag
+            cls._persist()
         logger.info(f"Prompt fairness filter {'ON' if flag else 'OFF'}")
 
     @classmethod
     def set_number_of_options(cls, value: int) -> None:
-        """Set the number of dialogue options generated per turn, loading defaults first if needed.
-
-        Args:
-            value: Number of player response options to generate.
-        """
-        if cls._settings is None:
-            cls()  # force loading with defaults
-        cls._settings.number_of_options = value
+        """Set the number of dialogue options per turn and persist it."""
+        with cls._lock:
+            cls._ensure_loaded()
+            cls._settings.number_of_options = value
+            cls._persist()
         logger.info(f"Number of options set to {value}")
 
     @classmethod
     def update_llm_settings(cls, llm_settings: LLMSettings) -> None:
-        """Replace the LLM settings (temperature, max tokens), loading defaults first if needed.
-
-        Args:
-            llm_settings: The new LLM settings to apply.
-        """
-        if cls._settings is None:
-            cls()  # force loading with defaults
-        cls._settings.llm = llm_settings
-        logger.info(
-            f"LLM settings updated: temperature={llm_settings.temperature}"
-        )
+        """Replace the LLM settings (temperature) and persist them."""
+        with cls._lock:
+            cls._ensure_loaded()
+            cls._settings.llm = llm_settings
+            cls._persist()
+        logger.info(f"LLM settings updated: temperature={llm_settings.temperature}")
 
     @classmethod
     def update_profanity_mode_settings(cls, profanity_mode: ProfanityMode) -> None:
-        """Replace the profanity mode, loading defaults first if needed.
-
-        Args:
-            profanity_mode: The new profanity mode setting to apply.
-        """
-        if cls._settings is None:
-            cls()  # force loading with defaults
-        cls._settings.profanity_mode = profanity_mode
-        logger.info(
-            f"Profanity mode setting updated: {profanity_mode.value}"
-        )
+        """Replace the profanity mode and persist it."""
+        with cls._lock:
+            cls._ensure_loaded()
+            cls._settings.profanity_mode = profanity_mode
+            cls._persist()
+        logger.info(f"Profanity mode setting updated: {profanity_mode.value}")
 
     @classmethod
     def update_censor_word(cls, censor_word: str) -> None:
-        """Updates the censor word, loading defaults first if needed.
-        
-        Args:
-            censor_word: The new censor word.
-        """
-        if cls._settings is None:
-            cls()  # force loading with defaults
-        cls._settings.censor_word = censor_word
-        logger.info(
-            f"Censor word updated: {censor_word}"
-        )
+        """Update the censor word and persist it."""
+        with cls._lock:
+            cls._ensure_loaded()
+            cls._settings.censor_word = censor_word
+            cls._persist()
+        logger.info(f"Censor word updated: {censor_word}")
 
     @classmethod
     def update_refiner_max_iterations(cls, max_iterations: int) -> None:
-        """Updates the refiner max iterations setting, loading defaults first if needed.
-        
-        Args:
-            max_iterations: The new refiner max iterations.
-        """
-        if cls._settings is None:
-            cls()  # force loading with defaults
-        cls._settings.refiner_max_iterations = max_iterations
-        logger.info(
-            f"Refiner max iterations updated: {max_iterations}"
-        )
-    
+        """Update the refiner max iterations and persist it."""
+        with cls._lock:
+            cls._ensure_loaded()
+            cls._settings.refiner_max_iterations = max_iterations
+            cls._persist()
+        logger.info(f"Refiner max iterations updated: {max_iterations}")
+
     @classmethod
     def get_current(cls) -> AppSettings:
-        """Return the currently loaded settings, loading defaults first if needed.
-
-        Returns:
-            AppSettings: The current validated application settings.
-        """
-        if cls._settings is None:
-            cls()  # force loading with defaults
+        cls._ensure_loaded()
         return cls._settings
