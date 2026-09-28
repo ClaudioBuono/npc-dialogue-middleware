@@ -18,7 +18,7 @@ RAW_DIST_DIR = ROOT / "dist"
 # Versioned template -> real filename shipped in the final package
 CONFIG_FILES = {
     "settings.example.yaml": "settings.yaml",
-    "modelconfigs.example.json": "modelconfigs.json",
+    "modelconfigs.example.yaml": "modelconfigs.yaml",
 }
 
 

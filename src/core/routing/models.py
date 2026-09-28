@@ -1,6 +1,6 @@
-import json
 from typing import Any, List, Optional, Union
 from pydantic import BaseModel, Field, ValidationError
+import yaml
 from core.types.enums import ComplexityTier
 from pathlib import Path
 
@@ -73,8 +73,8 @@ def load_config_from_file(config_path: Union[str, Path]) -> List[ModelConfig]:
         raise ValueError(f"Could not read config file {path}: {e}") from e
 
     try:
-        models_config = json.loads(raw_content)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in config file {path}: {e}") from e
+        models_config = yaml.safe_load(raw_content)
+    except yaml.YAMLError as e:
+        raise ValueError(f"Invalid YAML in config file {path}: {e}") from e
 
     return load_model_configs(models_config)

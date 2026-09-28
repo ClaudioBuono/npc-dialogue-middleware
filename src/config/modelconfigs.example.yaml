@@ -1,0 +1,25 @@
+# Model configuration. Copy this file to modelconfigs.yaml to customize it.
+# The file is a list: each entry declares one model the middleware can use.
+#
+# Required fields: id, endpoint
+# Optional fields: intended_tier, max_context_tokens, api_key
+
+# Local model (e.g. served by Ollama): no API key needed
+- # Unique identifier for this model within the middleware
+  id: "llama3.2:latest"
+  # Base URL of the model's OpenAI-compatible API endpoint
+  endpoint: "http://localhost:11434/v1"
+  # Developer-declared power tier. Used directly when profiling is disabled,
+  # and as a fallback when automatic profiling is not yet available
+  # (see the ComplexityTier enum for valid values, e.g. "low", "high")
+  intended_tier: "low"
+  # Maximum context window supported by the model, in tokens
+  max_context_tokens: 8192
+
+# Remote model (e.g. Groq): requires an API key
+- id: "openai/gpt-oss-120b"
+  endpoint: "https://api.groq.com/openai/v1"
+  intended_tier: "high"
+  max_context_tokens: 1048576
+  # API key, if required by the provider
+  api_key: "YOUR_GROQ_API_KEY"

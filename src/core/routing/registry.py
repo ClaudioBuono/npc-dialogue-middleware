@@ -27,7 +27,7 @@ class ModelRegistry:
             instance = super().__new__(cls)
             instance._ranked_models = []
             instance._models_configs = load_config_from_file(
-                resolve_config_file(Settings()._config_dir, "modelconfigs.json")
+                resolve_config_file(Settings()._config_dir, "modelconfigs.yaml")
             )
             cls._instance = instance
         return cls._instance
