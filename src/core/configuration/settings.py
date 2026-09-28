@@ -5,6 +5,7 @@ from threading import Lock
 import yaml
 from blinker import Signal
 
+from core.helpers.paths import resolve_config_file
 from core.types.enums import Language, ProfanityMode
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ class Settings:
             IsADirectoryError: If path points to a directory instead of a file.
             FileNotFoundError: If the settings file does not exist.
         """
+        path = resolve_config_file(path.parent, path.name)
         if path.is_dir():
             raise IsADirectoryError(
                 f"Expected the file {self.SETTINGS_FILENAME}, got a directory: {path}"

@@ -1,0 +1,35 @@
+# Application settings. Copy this file to settings.yaml to customize it.
+# Missing fields fall back to the defaults defined in AppSettings.
+
+# Language used for the generated dialogue (see the Language enum for valid values)
+# Default: English
+language: "en"
+
+# Number of player response options generated per turn
+# Default: 2
+number_of_options: 3
+
+# Enable performance profiling
+# Default: false
+profiling: false
+
+# Filter prompts to avoid biased or unfair content
+# Default: true
+prompt_fairness_filter: true
+
+# How profanity is handled (see the ProfanityMode enum for valid values, e.g. "censor")
+# Default: "stop"
+profanity_mode: "censor"
+
+# Replacement text used when profanity_mode is "censor"
+# Default: "[CENSORED]"
+censor_word: "[CENSORED]"
+
+# Maximum number of refinement iterations
+# Default: 3
+refiner_max_iterations: 3
+
+llm:
+  # Sampling temperature, between 0.0 and 2.0
+  # Default: 0.7
+  temperature: 0.3

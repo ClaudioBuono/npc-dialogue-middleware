@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local configuration: only the *.example.* templates are versioned
+/src/config/*
+!/src/config/*.example.*
+
+# Runtime output when running from source
+/src/logs/
+
+# Build output (contains the real config copied at build time)
+/npc_middleware/

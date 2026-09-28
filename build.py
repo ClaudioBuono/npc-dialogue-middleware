@@ -15,6 +15,12 @@ BUILD_DIR = ROOT / "build"
 SPEC_DIR = ROOT
 RAW_DIST_DIR = ROOT / "dist"
 
+# Versioned template -> real filename shipped in the final package
+CONFIG_FILES = {
+    "settings.example.yaml": "settings.yaml",
+    "modelconfigs.example.json": "modelconfigs.json",
+}
+
 
 def sep() -> str:
     """Return the correct separator for PyInstaller's --add-data argument."""
@@ -44,8 +50,6 @@ def run_pyinstaller():
         "--workpath", str(BUILD_DIR),
         "--specpath", str(SPEC_DIR),
         "--paths", str(SRC_DIR),
-        "--add-data", f"{CONFIG_SRC / 'settings.yaml'}{sep()}config",
-        "--add-data", f"{CONFIG_SRC / 'modelconfigs.json'}{sep()}config",
         "--add-data", f"{ASSETS_SRC}{sep()}.",  # destination "." = bundle root
         str(MAIN_SCRIPT),
     ], check=True, cwd=SRC_DIR)
@@ -72,14 +76,14 @@ def assemble_package(package_dir: Path):
     shutil.copy(built_exe, final_exe)
     print(f"Copied executable to {final_exe}")
 
-    for filename in ["settings.yaml", "modelconfigs.json"]:
-        src = CONFIG_SRC / filename
-        dest = config_dest / filename
+    for example_name, real_name in CONFIG_FILES.items():
+        src = CONFIG_SRC / example_name
+        dest = config_dest / real_name
         if not dest.exists():
             shutil.copy(src, dest)
-            print(f"Copied {filename} to {dest}")
+            print(f"Copied {example_name} to {dest}")
         else:
-            print(f"{filename} already present, not overwritten")
+            print(f"{real_name} already present, not overwritten")
 
 
 def cleanup_raw_artifacts():
@@ -120,7 +124,12 @@ def check_config_files_exist():
     PyInstaller fail later with a less readable "Unable to find" error
     during the --add-data step.
     """
-    missing = []
+    missing = [
+        str(CONFIG_SRC / example_name)
+        for example_name in CONFIG_FILES
+        if not (CONFIG_SRC / example_name).exists()
+    ]
+    
     for filename in ["settings.yaml", "modelconfigs.json"]:
         path = CONFIG_SRC / filename
         if not path.exists():

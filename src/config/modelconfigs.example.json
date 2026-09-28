@@ -1,0 +1,15 @@
+[
+  {
+    "id": "llama3.2:latest",
+    "endpoint": "http://localhost:11434/v1",
+    "intended_tier": "low",
+    "max_context_tokens": 8192
+  },
+  {
+    "id": "openai/gpt-oss-120b",
+    "endpoint": "https://api.groq.com/openai/v1",
+    "intended_tier": "high",
+    "max_context_tokens": 1048576,
+    "api_key": "YOUR_GROQ_API_KEY"
+  }
+]

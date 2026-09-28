@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional
 from core.configuration.settings import Settings
+from core.helpers.paths import resolve_config_file
 from core.routing.models import ModelConfig, load_config_from_file
 from core.routing.profiler import BaseProfiler, SelfAssessmentProfiler, BenchmarkProfiler, RankedModel, build_client, _TIER_TO_SCORE
 from core.types.enums import ComplexityTier
@@ -26,7 +27,7 @@ class ModelRegistry:
             instance = super().__new__(cls)
             instance._ranked_models = []
             instance._models_configs = load_config_from_file(
-                Settings()._config_dir / "modelconfigs.json"
+                resolve_config_file(Settings()._config_dir, "modelconfigs.json")
             )
             cls._instance = instance
         return cls._instance

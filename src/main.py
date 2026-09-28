@@ -132,12 +132,12 @@ def main():
 
     StateManager(initial_state = MiddlewareState.STARTING)
 
+    setup_logging(logging.DEBUG)
+    logger = logging.getLogger(__name__)
+
     config_dir = Path(args.config_dir) if args.config_dir else get_base_path() / "config"
     Settings.configure(config_dir)
     Settings()  # force loading now, to fail fast on invalid/missing config
-
-    setup_logging(logging.DEBUG)
-    logger = logging.getLogger(__name__)
     logger.info("Starting middleware")
 
     # # Instantiate Orchestrator singleton
