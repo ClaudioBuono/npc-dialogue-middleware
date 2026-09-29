@@ -8,10 +8,10 @@ from api.schemas import (
     MiddlewareStatusResponse,
     LanguageRequest,
     ToggleRequest,
-    NumberOfOptionsRequest,
+    IntegerRequest,
     SettingsUpdatedResponse
 )
-from core.types.contexts import Dialogue, Quest, NPCContext, Talkativeness
+from core.types.contexts import Dialogue, NPCContext, Talkativeness
 from core.types.enums import Language
 
 def test_dialogue_options_schema_valid():
@@ -94,12 +94,12 @@ def test_toggle_request():
     assert schema.enabled is True
 
 def test_number_of_options_request_valid():
-    schema = NumberOfOptionsRequest(value=3)
+    schema = IntegerRequest(value=3)
     assert schema.value == 3
 
 def test_number_of_options_request_invalid():
     with pytest.raises(ValidationError):
-        NumberOfOptionsRequest(value=0)  # ge=1 constraint
+        IntegerRequest(value=0)  # ge=1 constraint
 
 def test_settings_updated_response():
     schema = SettingsUpdatedResponse()

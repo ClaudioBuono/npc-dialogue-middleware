@@ -1,6 +1,6 @@
-import json
 import pytest
 from pydantic import ValidationError
+import yaml
 
 from core.routing.models import ModelConfig, load_model_configs, load_config_from_file
 from core.types.enums import ComplexityTier
@@ -93,11 +93,11 @@ def test_load_model_configs_invalid_schema():
 # ------------------------------------------------------------------
 
 def test_load_config_from_file_success(tmp_path):
-    """Verifies successful loading and parsing from a valid JSON file."""
+    """Verifies successful loading and parsing from a valid YAML file."""
 
-    valid_file = tmp_path / "valid.json"
+    valid_file = tmp_path / "valid.yaml"
     valid_data = [{"id": "model-1", "endpoint": "http://ep1", "intended_tier": "high"}]
-    valid_file.write_text(json.dumps(valid_data), encoding="utf-8")
+    valid_file.write_text(yaml.safe_dump(valid_data), encoding="utf-8")
 
     configs = load_config_from_file(valid_file)
     assert len(configs) == 1
@@ -107,32 +107,34 @@ def test_load_config_from_file_success(tmp_path):
 
 def test_load_config_from_file_failures(tmp_path):
     """Verifies all failure modes during file reading and parsing."""
-    
+
     # 1. File not found
     with pytest.raises(FileNotFoundError):
-        load_config_from_file(tmp_path / "does_not_exist.json")
+        load_config_from_file(tmp_path / "does_not_exist.yaml")
 
     # 2. Path is a directory instead of a file
     with pytest.raises(ValueError) as excinfo:
         load_config_from_file(tmp_path)
     assert "Config path is not a file" in str(excinfo.value)
 
-    # 3. Invalid JSON formatting
-    invalid_json_file = tmp_path / "invalid_json.json"
-    invalid_json_file.write_text("invalid json content", encoding="utf-8")
+    # 3. Invalid YAML formatting (unclosed flow sequence)
+    invalid_yaml_file = tmp_path / "invalid_yaml.yaml"
+    invalid_yaml_file.write_text("models: [unclosed", encoding="utf-8")
     with pytest.raises(ValueError) as excinfo:
-        load_config_from_file(invalid_json_file)
-    assert "Invalid JSON in config file" in str(excinfo.value)
+        load_config_from_file(invalid_yaml_file)
+    assert "Invalid YAML in config file" in str(excinfo.value)
 
-    # 4. JSON is valid but does not match expected list structure
-    non_list_file = tmp_path / "non_list.json"
-    non_list_file.write_text(json.dumps({"id": "model-1", "endpoint": "http://ep"}), encoding="utf-8")
+    # 4. YAML is valid but does not match expected list structure
+    non_list_file = tmp_path / "non_list.yaml"
+    non_list_file.write_text(
+        yaml.safe_dump({"id": "model-1", "endpoint": "http://ep"}), encoding="utf-8"
+    )
     with pytest.raises(ValueError) as excinfo:
         load_config_from_file(non_list_file)
     assert "Expected models_config to be a list" in str(excinfo.value)
 
     # 5. Schema validation failure inside the file
-    invalid_schema_file = tmp_path / "invalid_schema.json"
-    invalid_schema_file.write_text(json.dumps([{"id": "only-id"}]), encoding="utf-8")
+    invalid_schema_file = tmp_path / "invalid_schema.yaml"
+    invalid_schema_file.write_text(yaml.safe_dump([{"id": "only-id"}]), encoding="utf-8")
     with pytest.raises(ValidationError):
         load_config_from_file(invalid_schema_file)

@@ -1,6 +1,8 @@
 from pydantic import ValidationError
 import pytest
-from core.contract_builder import ContractBuilder
+from api.schemas import ComposedDialogue
+from core.generation.contract_builder import ContractBuilder
+from core.generation.history import DialogueHistory
 from core.types.contexts import GameContext, NPCContext, Dialogue, Quest, Talkativeness
 from core.types.dataclasses import Contract
 
@@ -29,7 +31,7 @@ def test_build_dialogue_intent(builder, game_context):
         intent=dialogue
     )
     
-    contract = builder.build(game_context, npc_context, dialogue_history=[])
+    contract = builder.build_dialogue_contract(game_context, npc_context, dialogue_history=[])
     
     assert isinstance(contract, Contract)
     assert "Eldrin" in contract.user_prompt
@@ -58,7 +60,7 @@ def test_build_quest_intent(builder, game_context):
         intent=quest
     )
     
-    contract = builder.build(game_context, npc_context, dialogue_history=[])
+    contract = builder.build_dialogue_contract(game_context, npc_context, dialogue_history=[])
     
     assert isinstance(contract, Contract)
     assert "Elara" in contract.user_prompt
@@ -81,7 +83,7 @@ def test_build_invalid_intent(builder, game_context):
                 main_character_relation="Hostile",
                 intent="Invalid Intent Type" # type: ignore
             )
-        builder.build(game_context, npc_context, dialogue_history=[])
+        builder.build_dialogue_contract(game_context, npc_context, dialogue_history=[])
 
 def test_build_with_history(builder, game_context):
     dialogue = Dialogue(type="Dialogue", has_options=False)
@@ -92,10 +94,16 @@ def test_build_with_history(builder, game_context):
         context="Sitting by the fire",
         talkativeness=Talkativeness.HIGH,
         main_character_relation="Neutral",
-        intent=dialogue
+        intent=dialogue,
     )
-    
-    history = [{"player": "Hello", "npc": "Greetings"}]
-    contract = builder.build(game_context, npc_context, dialogue_history=history)
-    
-    assert "Greetings" in contract.user_prompt
+
+    history = DialogueHistory()
+    history.add_player_dialogue_to_history("Hello")
+    history.add_npc_dialogue_to_history(ComposedDialogue(intent=dialogue, dialogue="Greetings"))
+
+    contract = builder.build_dialogue_contract(
+        game_context, npc_context, dialogue_history=history.get_dialogue_history()
+    )
+
+    assert "Player: Hello" in contract.user_prompt
+    assert "Greetings" in contract.user_prompt, contract.user_prompt

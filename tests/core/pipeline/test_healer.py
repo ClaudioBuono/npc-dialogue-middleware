@@ -1,14 +1,13 @@
 import pytest
 from unittest.mock import MagicMock
 from pydantic import BaseModel, ValidationError
-
 from api.schemas import ComposedDialogue
 from core.configuration.settings import Settings
 from core.generation.contract_builder import ContractBuilder
+from core.generation.output_composer import DialogueOutputComposer
 from core.pipeline.healer import Healer
 from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.errors import PreProcessingError, ValidationErrorCode
-from core.tools.output_composer import DialogueOutputComposer
 from core.types.contexts import Dialogue, GameContext, NPCContext, Quest
 from core.types.dataclasses import JudgeIssue, Contract
 
