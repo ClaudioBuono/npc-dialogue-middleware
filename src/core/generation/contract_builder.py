@@ -121,7 +121,7 @@ class ContractBuilder:
         Establishes the model's role, the game world context, and general output
         rules.
         """
-        world_context = WORLD_CONTEXT_PROMPT.format(
+        world_context = WORLD_CONTEXT_TEMPLATE.format(
             environment=game_context.environment,
             epoch=game_context.epoch,
             world_state=game_context.world_state,
@@ -129,13 +129,13 @@ class ContractBuilder:
 
         prompts = [
             ROLE_PROMPT,
-            LANGUAGE_RULE_PROMPT.format(language = Settings().language.name),
+            LANGUAGE_RULE_TEMPLATE.format(language = Settings().language.name),
             world_context,
         ]
 
         if game_context.main_character_description:
             prompts.append(
-                MAIN_CHARACTER_PROMPT.format(
+                MAIN_CHARACTER_TEMPLATE.format(
                     main_character_description=game_context.main_character_description
                 )
             )
@@ -157,7 +157,7 @@ class ContractBuilder:
         
         lines = [
             NPC_CONTEXT_BASE_QUEST_PROMPT if isinstance(npc_context.intent, Quest) else NPC_CONTEXT_BASE_DIALOGUE_PROMPT,
-            NPC_FIELDS_PROMPT.format(
+            NPC_FIELDS_TEMPLATE.format(
                 name = npc_context.name,
                 age = npc_context.age,
                 personality = npc_context.personality,
@@ -183,7 +183,7 @@ class ContractBuilder:
         result = "\n".join(lines)
 
         if dialogue_history:
-            dialogue_history_prompt = DIALOGUE_HISTORY_PROMPT.format(dialogue_history = format_dialogue_history(dialogue_history, npc_context.name))
+            dialogue_history_prompt = DIALOGUE_HISTORY_TEMPLATE.format(dialogue_history = format_dialogue_history(dialogue_history, npc_context.name))
 
             result = "\n".join(
                 [
@@ -264,12 +264,12 @@ class ContractBuilder:
                 lines.append(f"- You MUST USE the following expression in the dialogue: {intent.must_use_expression}")
 
             if intent.has_options:
-                lines.append(DIALOGUE_OPTIONS_PROMPT.format(number_of_options = Settings().number_of_options))
+                lines.append(DIALOGUE_OPTIONS_TEMPLATE.format(number_of_options = Settings().number_of_options))
 
 
         if isinstance(intent, Quest):
             if intent.has_choice:
-                lines.append(QUEST_CHOICE_PROMPT.format(number_of_options = Settings().number_of_options))
+                lines.append(QUEST_CHOICE_TEMPLATE.format(number_of_options = Settings().number_of_options))
 
 
         result = "\n".join(lines)
@@ -393,14 +393,14 @@ class ContractBuilder:
         formatted_npc_context = format_npc_content(npc_context)
         formatted_game_context = format_game_context(game_context)
 
-        judge_body_prompt = JUDGE_BODY_PROMPT.format(
+        judge_body_prompt = JUDGE_BODY_TEMPLATE.format(
             npc_context=formatted_npc_context,
             game_context=formatted_game_context,
             dialogue=formatted_dialogue,
         )
 
         user_prompt_lines = [
-            JUDGE_TASK_PROMPT.format(questions=format_judge_questions(questions)),
+            JUDGE_TASK_TEMPLATE.format(questions=format_judge_questions(questions)),
             judge_body_prompt,
         ]
 
@@ -481,14 +481,14 @@ class ContractBuilder:
         formatted_npc_context = format_npc_content(npc_context)
         formatted_game_context = format_game_context(game_context)
 
-        healer_body_prompt = HEALER_BODY_PROMPT_TEMPLATE.format(
+        healer_body_prompt = HEALER_BODY_TEMPLATE.format(
             npc_context=formatted_npc_context,
             game_context=formatted_game_context,
             dialogue=formatted_dialogue,
         )
 
         user_prompt_lines = [
-            HEALER_TASK_PROMPT_TEMPLATE.format(issues=format_judge_issues(issues)),
+            HEALER_TASK_TEMPLATE.format(issues=format_judge_issues(issues)),
             healer_body_prompt,
         ]
 

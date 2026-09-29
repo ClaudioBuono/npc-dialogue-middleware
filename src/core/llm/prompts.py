@@ -1,5 +1,9 @@
 import inspect
 
+# Naming convention:
+# - *_PROMPT   -> static text, usable as-is
+# - *_TEMPLATE -> contains {placeholders}, must be passed through .format(...)
+
 NPC_CONTEXT_BASE_QUEST_PROMPT = inspect.cleandoc("""
     Embody the following NPC completely that has the main TASK to give a QUEST to the main character. 
     Every line of the quest dialogue must authentically reflect their profile, mannerisms, and background. 
@@ -10,7 +14,7 @@ NPC_CONTEXT_BASE_DIALOGUE_PROMPT = inspect.cleandoc("""
 """)
 
 
-NPC_FIELDS_PROMPT = inspect.cleandoc("""
+NPC_FIELDS_TEMPLATE = inspect.cleandoc("""
     FIELD GUIDANCE:
     - Personality: Defines the NPC's emotional state, attitude, and moral compass.
     - Context: The NPC's current situation, objectives, and immediate environment.
@@ -51,11 +55,11 @@ QUEST_BASE_PROMPT = inspect.cleandoc("""
     do not add extra quest details beyond what is given:
 """)
 
-QUEST_CHOICE_PROMPT = inspect.cleandoc("""
+QUEST_CHOICE_TEMPLATE = inspect.cleandoc("""
     - Beyond the {number_of_options} additional dialogue options, include explicitly 1 "accept" option and 1 "refuse" option in the \"player_options\" field. Both choices must directly address accepting or declining the quest's objective FROM THE MAIN CHARACTER'S POINT OF VIEW.
 """)
 
-DIALOGUE_OPTIONS_PROMPT = inspect.cleandoc("""
+DIALOGUE_OPTIONS_TEMPLATE = inspect.cleandoc("""
     - You MUST generate EXACTLY {number_of_options} additional dialogue options allowing the player to ask for details or context. These options MUST go into the \"dialogue_options\" field. NEVER allude at a possible acceptance or refusal of the quest when giving options. 
 """)
 
@@ -63,21 +67,21 @@ ROLE_PROMPT = inspect.cleandoc("""
     You are a narrative designer generating dialogue for NPCs (non-player characters) in a videogame.
 """)
 
-WORLD_CONTEXT_PROMPT = inspect.cleandoc("""
+WORLD_CONTEXT_TEMPLATE = inspect.cleandoc("""
     Use the following worldbuilding directives to shape the tone, dialogue, and atmospheric details of all generated content.
-	
+
     WORLD CONTEXT:
     - Environment: {environment}
     - Epoch: {epoch}
     - Current Situation: {world_state}
 """)
 
-MAIN_CHARACTER_PROMPT = inspect.cleandoc("""
+MAIN_CHARACTER_TEMPLATE = inspect.cleandoc("""
     The NPC will interact with the main character with the following description: 
     {main_character_description}
 """)
 
-DIALOGUE_HISTORY_PROMPT = inspect.cleandoc("""
+DIALOGUE_HISTORY_TEMPLATE = inspect.cleandoc("""
     DIALOGUE HISTORY:
     These are the main events of the current conversation between you and the main character:
     {dialogue_history}
@@ -97,7 +101,7 @@ GENERAL_RULES_PROMPT = inspect.cleandoc("""
     - Respond ONLY with a valid JSON object matching the schema provided by the user, with no additional text, explanation, or markdown formatting.
 """)
 
-LANGUAGE_RULE_PROMPT = inspect.cleandoc("""
+LANGUAGE_RULE_TEMPLATE = inspect.cleandoc("""
     OUTPUT LANGUAGE:
     All text values in the JSON (dialogues, descriptions, options) MUST be written entirely in {language}.
 """)
@@ -126,14 +130,14 @@ JUDGE_BASE_PROMPT = inspect.cleandoc("""
     You don't know who or what generated the line.  
 """)
 
-JUDGE_TASK_PROMPT = inspect.cleandoc("""
+JUDGE_TASK_TEMPLATE = inspect.cleandoc("""
     Answer the following questions about the dialogue, using only the game
     context, NPC context, and dialogue provided below.
     QUESTIONS:
     {questions}
 """)
 
-JUDGE_BODY_PROMPT = inspect.cleandoc("""
+JUDGE_BODY_TEMPLATE = inspect.cleandoc("""
     THIS IS THE GAME CONTEXT:
     {game_context}
     
@@ -162,27 +166,27 @@ HEALER_BASE_PROMPT = inspect.cleandoc("""
     not introduce stylistic changes, new claims, or new named entities
     beyond what is strictly needed to fix the listed problems.
 """)
- 
-HEALER_TASK_PROMPT_TEMPLATE = inspect.cleandoc("""
+
+HEALER_TASK_TEMPLATE = inspect.cleandoc("""
     Rewrite the dialogue below so that every issue listed is resolved,
     while keeping the NPC's tone, personality, and approximate length
     unchanged. Do not change anything that is not listed as an issue.
- 
+
     ISSUES TO FIX:
     {issues}
 """)
- 
-HEALER_BODY_PROMPT_TEMPLATE = inspect.cleandoc("""
+
+HEALER_BODY_TEMPLATE = inspect.cleandoc("""
     THIS IS THE GAME CONTEXT:
     {game_context}
- 
+
     THIS IS THE NPC CONTEXT:
     {npc_context}
- 
+
     THIS IS THE DIALOGUE TO REPAIR:
     {dialogue}
 """)
- 
+
 HEALER_RULES_PROMPT = inspect.cleandoc("""
     RULES:
     - Change only what is necessary to resolve the listed issues.
