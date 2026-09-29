@@ -69,7 +69,7 @@ class Healer:
             # never silently reaches the rest of the pipeline.
             composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, healer_output_raw)
 
-        except ValPreProcessingError:
+        except ValidationError as e:
             raise PreProcessingError(code=ValidationErrorCode.INVALID_VALUE, errors=[f"Healer output does not match expected schema: {e}", f"Raw output: {healer_output_raw}"])
 
         return composed_dialogue
