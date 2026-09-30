@@ -5,6 +5,7 @@ from core.routing.profiler import (
     SelfAssessmentProfiler,
     BenchmarkProfiler,
     build_client,
+    _ProbeMeasurement,
     _TIER_TO_SCORE,
     _DEFAULT_FALLBACK_SCORE,
     _TIMEOUT_PENALTY_SCORE,
@@ -74,12 +75,12 @@ def test_measure_time_to_first_token_and_throughput_success():
 
     # Simulate: Start (10.0) -> First Token (11.0) -> End (12.0)
     with patch("time.perf_counter", side_effect=[10.0, 11.0, 12.0]):
-        total_time, ttft, throughput = profiler._measure_time_to_first_token_and_throughput(mock_client)
-
-    assert total_time == 2.0 # 12.0 - 10.0
-    assert ttft == 1.0       # 11.0 - 10.0
+        result = profiler._measure_time_to_first_token_and_throughput(mock_client)
+        
+    # completition_time: 12.0 - 10.0 = 2.0
+    # time to first token: 11.0 - 10.0 
     # generation time = 1.0s, tokens = 2.0 -> throughput = 2.0
-    assert throughput == 2.0
+    assert result == _ProbeMeasurement(completion_time=2.0, ttft=1.0, throughput=2.0)
 
 
 def test_measure_time_to_first_token_and_throughput_empty_response():
@@ -125,9 +126,10 @@ def test_compute_score_success():
     # Mock measurement to return exact scaling values (score 0.5, 0.5, 1.0)
     # Assuming weights: completion_time=0.45, ttft=0.35, throughput=0.20
     # (0.5 * 0.45) + (0.5 * 0.35) + (1.0 * 0.20) = 0.60
-    with patch.object(profiler, "_measure_time_to_first_token_and_throughput", return_value=(8.0, 2.0, 40.0)):
+    measurement = _ProbeMeasurement(completion_time=8.0, ttft=2.0, throughput=40.0)
+    with patch.object(profiler, "_measure_time_to_first_token_and_throughput", return_value=measurement):
         score = profiler._compute_score(mock_client, model_cfg)
-    
+
     assert score == 0.60
 
 

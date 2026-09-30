@@ -11,12 +11,11 @@ from openai import (
     APITimeoutError,
     APIStatusError,
 )
-from core.infrastructure.telemetry import TelemetryRecorder
+from core.infrastructure.telemetry import TelemetryRecorder, VramReading
 from core.types.dataclasses import Contract
 from core.llm.llm_base_client import BaseLLMClient
 from core.tools.errors import LLMClientError, LLMClientErrorCode
 logger = logging.getLogger(__name__)
-
 
 class OpenAICompatibleClient(BaseLLMClient):
     """Generic client for any provider exposing an OpenAI-compatible API.
@@ -98,7 +97,7 @@ class OpenAICompatibleClient(BaseLLMClient):
                     message=f"Provider returned an error (status {e.status_code}) for model '{self._model_identifier}': {e}",
                 ) from e
 
-            recorder.set_vram(*self._probe_vram())
+            recorder.set_vram(self._probe_vram())
 
         content = "".join(chunks)
 
@@ -161,7 +160,7 @@ class OpenAICompatibleClient(BaseLLMClient):
             except APIStatusError as e:
                 raise LLMClientError(code=LLMClientErrorCode.UNKNOWN_ERROR, message=f"Provider returned an error (status {e.status_code}) for model '{self._model_identifier}': {e}") from e
             finally:
-                recorder.set_vram(*self._probe_vram())
+                recorder.set_vram(self._probe_vram())
                 recorder.__exit__(None, None, None)
 
 
@@ -218,48 +217,62 @@ class OpenAICompatibleClient(BaseLLMClient):
             },
         }
 
-    def _probe_vram(self) -> tuple[float | None, str]:
-        """Tries the Ollama /api/ps endpoint first (more precise, per-model);
-        falls back to NVML (total GPU VRAM) if it's not available."""
-        vram, source = self._probe_vram_ollama()
-        if vram is not None:
-            return vram, source
+    def _probe_vram(self) -> VramReading:
+        """Measures VRAM usage, preferring the most precise source available.
+
+        Tries Ollama's /api/ps endpoint first (per-model footprint), then falls
+        back to NVML (total GPU VRAM in use).
+
+        Returns:
+            A `_VramReading`. Its `source` is "unavailable" if both probes fail.
+        """
+        reading = self._probe_vram_ollama()
+        if reading.used_mb is not None:
+            return reading
         return self._probe_vram_nvml()
 
-    def _probe_vram_nvml(self) -> tuple[float | None, str]:
+    def _probe_vram_nvml(self) -> VramReading:
         """Reads total VRAM currently in use on GPU 0 via NVML.
 
         Generic fallback for any backend, since it queries the GPU driver
-        directly rather than the inference server. Returns (None, "unavailable")
-        if NVML is not installed, no NVIDIA GPU is present, or the call fails
-        for any other reason.
+        directly rather than the inference server.
+
+        Returns:
+            A `_VramReading` with source "nvml", or an unavailable reading if
+            NVML is not installed, no NVIDIA GPU is present, or the call fails
+            for any other reason.
         """
         try:
             pynvml.nvmlInit()
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-            return round(info.used / (1024**2), 2), "nvml"
+            return VramReading(used_mb=round(info.used / (1024**2), 2), source="nvml")
         except Exception:
-            return None, "unavailable"
+            return VramReading.unavailable()
 
-    def _probe_vram_ollama(self) -> tuple[float | None, str]:
-        """Reads the VRAM used by this specific model from Ollama's /api/ps
-        endpoint, which lists currently loaded models along with their
-        per-model VRAM footprint (size_vram).
+    def _probe_vram_ollama(self) -> VramReading:
+        """Reads the VRAM used by this specific model from Ollama's /api/ps.
 
-        Returns (None, "unavailable") if the endpoint is unreachable (e.g. the
-        backend isn't Ollama), the request fails, or this model isn't currently
-        loaded.
+        The endpoint lists currently loaded models along with their per-model
+        VRAM footprint (size_vram).
+
+        Returns:
+            A `_VramReading` with source "ollama_ps", or an unavailable reading
+            if the endpoint is unreachable (e.g. the backend isn't Ollama), the
+            request fails, or this model isn't currently loaded.
         """
         try:
             resp = httpx.get(f"{self._client.base_url}/api/ps", timeout=1.0)
             models = resp.json().get("models", [])
             match = next((m for m in models if m["name"] == self._model_identifier), None)
             if match:
-                return round(match["size_vram"] / (1024**2), 2), "ollama_ps"
+                return VramReading(
+                    used_mb=round(match["size_vram"] / (1024**2), 2),
+                    source="ollama_ps",
+                )
         except Exception:
             pass
-        return None, "unavailable"
+        return VramReading.unavailable()
 
     def _log_human_readable_request(self, request: dict):
         """Logs the LLM request in a human-readable format."""

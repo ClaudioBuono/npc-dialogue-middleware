@@ -35,6 +35,22 @@ _THROUGHPUT_REFERENCE_TOKENS_PER_SEC = 40.0  # throughput at/above this -> full 
 
 _TEST_PROMPT = "Reply with the single word: ready."
 
+@dataclass(frozen=True, slots=True)
+class _ProbeMeasurement:
+    """Timing metrics collected from a single streaming profiling probe.
+
+    Attributes:
+        completion_time: Total time from request start to the last token,
+            in seconds.
+        ttft: Time to first token, in seconds.
+        throughput: Estimated generation speed in tokens per second,
+            computed over the time after the first token. The token count is
+            a character-based approximation, not a real tokenizer count.
+    """
+
+    completion_time: float
+    ttft: float
+    throughput: float
 
 @dataclass
 class RankedModel:
@@ -93,7 +109,7 @@ class BenchmarkProfiler(BaseProfiler):
         tier was declared either.
         """
         try:
-            completion_time, ttft, throughput = self._measure_time_to_first_token_and_throughput(client)
+            measurement = self._measure_time_to_first_token_and_throughput(client)
         except TimeoutError:
             # Hard limit violation: return a severely penalized score directly, 
             # bypassing any declared intent since the model is unresponsive.
@@ -101,9 +117,9 @@ class BenchmarkProfiler(BaseProfiler):
         except Exception:
             return _TIER_TO_SCORE[model.intended_tier] if model.intended_tier is not None else _DEFAULT_FALLBACK_SCORE
 
-        completion_time_score = self._normalize_lower_is_better(completion_time, _COMPLETION_TIME_SCALE_SECONDS)
-        ttft_score = self._normalize_lower_is_better(ttft, _TTFT_SCALE_SECONDS)
-        throughput_score = self._normalize_higher_is_better(throughput, _THROUGHPUT_REFERENCE_TOKENS_PER_SEC)
+        completion_time_score = self._normalize_lower_is_better(measurement.completion_time, _COMPLETION_TIME_SCALE_SECONDS)
+        ttft_score = self._normalize_lower_is_better(measurement.ttft, _TTFT_SCALE_SECONDS)
+        throughput_score = self._normalize_higher_is_better(measurement.throughput, _THROUGHPUT_REFERENCE_TOKENS_PER_SEC)
 
         weighted_sum = (
             completion_time_score * _WEIGHT_COMPLETION_TIME
@@ -114,7 +130,7 @@ class BenchmarkProfiler(BaseProfiler):
 
         return round(weighted_sum / total_weight, 2)
 
-    def _measure_time_to_first_token_and_throughput(self, client: BaseLLMClient) -> tuple[float, float, float]:
+    def _measure_time_to_first_token_and_throughput(self, client: BaseLLMClient) -> _ProbeMeasurement:
         """Runs a single streaming probe call, measuring total completion
         time, time to first token, and throughput together — avoids
         running separate calls purely for profiling, which would waste
@@ -157,7 +173,11 @@ class BenchmarkProfiler(BaseProfiler):
         token_estimate = self._estimate_token_count(full_text)
         throughput = token_estimate / generation_time
 
-        return total_completion_time, time_to_first_token, throughput
+        return _ProbeMeasurement(
+            completion_time=total_completion_time,
+            ttft=time_to_first_token,
+            throughput=throughput,
+        )
 
     @staticmethod
     def _estimate_token_count(text: str) -> float:

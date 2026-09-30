@@ -8,6 +8,7 @@ from core.generation.history import DialogueHistory
 from core.infrastructure.state_manager import StateManager
 from core.configuration.settings import Settings
 from core.types.contexts import GameContext, NPCContext
+from core.types.dataclasses import DialogueStream
 from core.types.enums import MiddlewareState, ProfanityMode
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 
@@ -94,7 +95,7 @@ class GenerateService:
 
         return dialogue
 
-    def start_stream(self, npc_context: NPCContext) -> tuple[Iterator[str], dict[str, str]]:
+    def start_stream(self, npc_context: NPCContext) -> DialogueStream:
         """
         Start a dialogue stream using the provided NPC context.
         """
@@ -106,10 +107,10 @@ class GenerateService:
 
         self._dialogue_history.clear_dialogue_history()
 
-        stream = self._safe_stream(npc_context, last_player_choice=None)
-        return stream, headers
+        chunks = self._safe_stream(npc_context, last_player_choice=None)
+        return DialogueStream(chunks, headers)
 
-    def continue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> tuple[Iterator[str], dict[str, str]]:
+    def continue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> DialogueStream:
         """
         Continue a dialogue stream using the provided NPC context and last player choice.
         """
@@ -120,8 +121,8 @@ class GenerateService:
         headers = self._profanity_warning_headers()
         npc_context = self._validate_and_normalize_npc_context(npc_context)
 
-        stream = self._safe_stream(npc_context, last_player_choice=last_player_choice)
-        return stream, headers
+        chunks = self._safe_stream(npc_context, last_player_choice=None)
+        return DialogueStream(chunks, headers)
 
     def _safe_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
         """

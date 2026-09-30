@@ -8,6 +8,7 @@ from core.infrastructure.state_manager import StateManager
 from core.types.contexts import GameContext, NPCContext
 from api.schemas import ComposedDialogue, DialogueStreamRequest, MiddlewareStatusResponse
 from api.errors import ALL_ERROR_RESPONSES, MIDDLEWARE_ERROR_RESPONSES, PREPROCESSING_ERROR_RESPONSES, ROUTING_CONFIG_ERROR_RESPONSES, error_responses
+from core.types.dataclasses import DialogueStream
 from core.types.enums import MiddlewareState, ProfanityMode
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 router = APIRouter(tags=["dialogue"])
@@ -117,8 +118,8 @@ def start_dialogue_stream(npc_context: NPCContext, service: GenerateService = De
             "STOP mode profanity filter cannot be used in streaming, continuing dialog in CENSOR mode."
         )
 
-    stream, headers = service.start_stream(npc_context)
-    return StreamingResponse(stream, media_type="text/plain", headers=headers)
+    result: DialogueStream  = service.start_stream(npc_context)
+    return StreamingResponse(result.chunks, media_type="text/plain", headers=result.headers)
 
 
 @router.post(
@@ -147,5 +148,5 @@ def continue_dialogue_stream(request: DialogueStreamRequest, service: GenerateSe
             "STOP mode profanity filter cannot be used in streaming, continuing dialog in CENSOR mode."
         )
 
-    stream, headers = service.continue_stream(request.npc_context, request.last_player_choice)
-    return StreamingResponse(stream, media_type="text/plain", headers=headers)
+    result: DialogueStream = service.continue_stream(request.npc_context, request.last_player_choice)
+    return StreamingResponse(result.chunks, media_type="text/plain", headers=result.headers)

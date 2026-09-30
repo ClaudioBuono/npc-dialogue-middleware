@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any
-
+from typing import Any, Iterator
 from pydantic import BaseModel
 
 @dataclass
@@ -25,6 +24,22 @@ class JudgeIssue:
     """An issue in the dialogue found by the Judge"""
     category: str
     issue: str
+
+@dataclass(frozen=True)
+class DialogueStream:
+    """A started dialogue stream together with its response headers.
+
+    Attributes:
+        chunks: Iterator yielding the dialogue text chunks. It is single-use:
+            once consumed it cannot be replayed. If an unhandled error occurs
+            during generation, it yields a final "[STREAM_ERROR]" marker
+            instead of raising.
+        headers: HTTP headers to attach to the response (e.g. profanity
+            warnings). Empty if there is nothing to report.
+    """
+
+    chunks: Iterator[str]
+    headers: dict[str, str]
 
 
 # TODO: move to a better place

@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass, field
 from types import ModuleType
-from typing import get_args, get_origin, Union
+from typing import Literal, get_args, get_origin, Union
 from pydantic import BaseModel
 from core.configuration.thresholds import CHARS_PER_TOKEN, HIGH_THRESHOLD, LOW_THRESHOLD
 from core.helpers.formatters import to_json_format
@@ -40,6 +40,34 @@ _QUEST_ONLY_LENGTH_THRESHOLD_NAMES = {
     "quest_reward": "MAX_QUEST_REWARD_LENGTH",
 }
 
+IntentKind = Literal["dialogue", "quest"]
+
+
+@dataclass(frozen=True, slots=True)
+class _ContextLengthScore:
+    """Context-length score together with the intermediate values behind it.
+
+    Useful to understand why a score saturates at 0.0 or 1.0.
+
+    Attributes:
+        score: Normalized context-length score, clamped to 0.0 - 1.0.
+        total_chars: Total length of all text fields (game context, NPC
+            context and intent), in characters.
+        estimated_tokens: `total_chars` converted to tokens using
+            `chars_per_token`. Unrounded.
+        min_tokens: Token count at or below which the score is 0.0.
+        max_tokens: Token count at or above which the score is 1.0. Depends
+            on the intent kind, since Quest has more fields than Dialogue.
+        intent_kind: Which intent was scored, and therefore which
+            `max_tokens` ceiling was applied.
+    """
+
+    score: float
+    total_chars: int
+    estimated_tokens: float
+    min_tokens: float
+    max_tokens: float
+    intent_kind: IntentKind
 
 @dataclass
 class ComplexityScore:
@@ -206,9 +234,7 @@ class ComplexityAnalyzer:
 
     def _score_context_length(self, game_context: GameContext, npc_context: NPCContext) -> float:
         """Longer world/NPC/intent text content → higher complexity. Rough token estimate."""
-
-        normalized, _debug = self._score_context_length_debug(game_context, npc_context)
-        return normalized
+        return self._score_context_length_debug(game_context, npc_context).score
 
 
     def _max_tokens_for_intent(self, intent: Quest | Dialogue) -> float:
@@ -326,12 +352,13 @@ class ComplexityAnalyzer:
     # DEBUG
     # ------------------------------------------------------------------
 
-    def _score_context_length_debug(
-    self, game_context: GameContext, npc_context: NPCContext) -> tuple[float, dict]:
-        """
-        Like _score_context_length, but also returns intermediate values 
-        (total_chars, estimated_tokens, min_tokens, max_tokens, intent_type) to 
-        understand why a score results in 0.0 or 1.0 (saturation).
+    def _score_context_length_debug(self, game_context: GameContext, npc_context: NPCContext) -> _ContextLengthScore:
+        """Like _score_context_length, but also exposes the intermediate values.
+
+        Returns:
+            A `_ContextLengthScore` with the normalized score plus total
+            characters, estimated tokens, min/max tokens and intent kind, to
+            understand why a score results in 0.0 or 1.0 (saturation).
         """
         total_chars = (
             self._text_fields_length(game_context)
@@ -345,11 +372,11 @@ class ComplexityAnalyzer:
         normalized = (estimated_tokens - self._min_tokens) / token_range
         normalized = min(max(normalized, 0.0), 1.0)
 
-        debug_info = {
-            "total_chars": total_chars,
-            "estimated_tokens": round(estimated_tokens, 1),
-            "min_tokens": round(self._min_tokens, 1),
-            "max_tokens": round(max_tokens, 1),
-            "intent_type": "quest" if isinstance(npc_context.intent, Quest) else "dialogue",
-        }
-        return normalized, debug_info
+        return _ContextLengthScore(
+            score=normalized,
+            total_chars=total_chars,
+            estimated_tokens=estimated_tokens,
+            min_tokens=self._min_tokens,
+            max_tokens=max_tokens,
+            intent_kind="quest" if isinstance(npc_context.intent, Quest) else "dialogue",
+        )

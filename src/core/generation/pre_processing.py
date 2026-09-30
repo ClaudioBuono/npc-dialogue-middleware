@@ -1,10 +1,54 @@
 import logging
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Generic, Optional, TypeVar
 from core.configuration.thresholds import *
 from core.types.contexts import GameContext, Dialogue, NPCContext, Quest
 from core.tools.errors import PreProcessingError, ValidationErrorCode
 
 logger = logging.getLogger(__name__)
+
+
+# --- RESULT TYPES ---
+
+# Generic intent type, so that IntentValidationResult[Quest]
+# and IntentValidationResult[Dialogue] are both valid, without
+# the need to make two very similar dataclasses.
+TIntent = TypeVar("TIntent", bound=Dialogue, covariant=True)
+
+
+@dataclass(frozen=True)
+class _DialogueBaseFieldsResult:
+    """Result of validating the fields shared by `Dialogue` and `Quest`.
+
+    Attributes:
+        must_use_expression: The normalized (stripped) `must_use_expression`,
+            or None if it was missing or empty.
+        more_info: The normalized (stripped) `more_info`, or None if it was
+            missing or empty.
+        errors: Validation error messages. Empty if validation succeeded.
+    """
+
+    must_use_expression: Optional[str]
+    more_info: Optional[str]
+    errors: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class _IntentValidationResult(Generic[TIntent]):
+    """Result of validating an intent (`Dialogue` or `Quest`).
+
+    Generic over the intent type, so that `_validate_quest` returns a
+    `_IntentValidationResult[Quest]` and `_validate_dialogue` returns a
+    `_IntentValidationResult[Dialogue]`.
+
+    Attributes:
+        normalized: The normalized copy of the validated intent. If the intent
+            was inconsistent or unknown, this is the original, unmodified object.
+        errors: Validation error messages. Empty if validation succeeded.
+    """
+
+    normalized: TIntent
+    errors: list[str] = field(default_factory=list)
 
 
 def normalize_and_validate_game_context(context: GameContext) -> GameContext:
@@ -78,8 +122,9 @@ def normalize_and_validate_npc_context(context: NPCContext) -> NPCContext:
 
     Performs semantic validation beyond what Pydantic already checks at
     the type level (e.g. length constraints, blank-string checks, age
-    bounds), including recursive validation of the nested `intent` field.
-    Returns a normalized copy of the context.
+    bounds), including recursive validation of the nested `intent` field
+    (delegated to `_validate_quest` or `_validate_dialogue`, which return an
+    `_IntentValidationResult`). Returns a normalized copy of the context.
 
     Args:
         context: The NPCContext instance to validate, already parsed and
@@ -148,30 +193,29 @@ def normalize_and_validate_npc_context(context: NPCContext) -> NPCContext:
 
     # --- Nested validation: intent (Quest | Dialogue) ---
 
-    normalized_intent: Quest | Dialogue
-    intent_errors: list[str]
+    intent_result: _IntentValidationResult[Quest | Dialogue]
 
     if context.intent.type == "Quest":
         if not isinstance(context.intent, Quest):
             errors.append(
                 "Field 'intent.type' is 'Quest' but the object is not a Quest instance."
             )
-            normalized_intent, intent_errors = context.intent, []
+            intent_result = _IntentValidationResult(normalized=context.intent)
         else:
-            normalized_intent, intent_errors = _validate_quest(context.intent)
+            intent_result = _validate_quest(context.intent)
     elif context.intent.type == "Dialogue":
         if not isinstance(context.intent, Dialogue) or isinstance(context.intent, Quest):
             errors.append(
                 "Field 'intent.type' is 'Dialogue' but the object is not a plain Dialogue instance."
             )
-            normalized_intent, intent_errors = context.intent, []
+            intent_result = _IntentValidationResult(normalized=context.intent)
         else:
-            normalized_intent, intent_errors = _validate_dialogue(context.intent)
+            intent_result = _validate_dialogue(context.intent)
     else:
         errors.append(f"Unknown value for field 'intent.type': '{context.intent.type}'.")
-        normalized_intent, intent_errors = context.intent, []
+        intent_result = _IntentValidationResult(normalized=context.intent)
 
-    errors.extend(intent_errors)
+    errors.extend(intent_result.errors)
 
     if errors:
         logger.warning(f"NPCContext validation failed with {len(errors)} errors: {errors}")
@@ -183,7 +227,7 @@ def normalize_and_validate_npc_context(context: NPCContext) -> NPCContext:
         age=context.age,
         personality=personality,
         context=npc_context_field,
-        intent=normalized_intent,
+        intent=intent_result.normalized,
         talkativeness=context.talkativeness,
         main_character_relation=main_character_relation,
         recent_plot=recent_plot,
@@ -195,7 +239,7 @@ def normalize_and_validate_npc_context(context: NPCContext) -> NPCContext:
 
 # --- PRIVATE METHODS ---
 
-def _validate_dialogue_base_fields(dialogue: Dialogue) -> tuple[Optional[str], Optional[str], list[str]]:
+def _validate_dialogue_base_fields(dialogue: Dialogue) -> _DialogueBaseFieldsResult:
     """Validate and normalize the fields shared by `Dialogue` and `Quest`.
 
     Since `Quest` inherits from `Dialogue`, this helper is reused by both
@@ -206,7 +250,9 @@ def _validate_dialogue_base_fields(dialogue: Dialogue) -> tuple[Optional[str], O
         dialogue: A Dialogue (or Quest, since it inherits from Dialogue) instance.
 
     Returns:
-        A tuple of (normalized must_use_expression, normalized more_info, list of error messages).
+        A `_DialogueBaseFieldsResult` containing the normalized
+        `must_use_expression`, the normalized `more_info`, and the list of
+        error messages (empty if validation succeeded).
     """
     errors: list[str] = []
 
@@ -218,20 +264,26 @@ def _validate_dialogue_base_fields(dialogue: Dialogue) -> tuple[Optional[str], O
     if more_info is not None and len(more_info) > MAX_MORE_INFO_LENGTH:
         errors.append(f"Field 'intent.more_info' must not exceed {MAX_MORE_INFO_LENGTH} characters.")
 
-    return must_use_expression, more_info, errors
+    return _DialogueBaseFieldsResult(
+        must_use_expression=must_use_expression,
+        more_info=more_info,
+        errors=errors,
+    )
 
 
-def _validate_quest(quest: Quest) -> tuple[Quest, list[str]]:
+def _validate_quest(quest: Quest) -> _IntentValidationResult[Quest]:
     """Validate and normalize a Quest instance.
 
     Args:
         quest: The Quest instance to validate.
 
     Returns:
-        A tuple of (normalized Quest, list of error messages).
-        The error list is empty if validation succeeded.
+        An `_IntentValidationResult[Quest]` containing the normalized Quest
+        and the list of error messages. The error list is empty if
+        validation succeeded.
     """
-    must_use_expression, more_info, errors = _validate_dialogue_base_fields(quest)
+    base = _validate_dialogue_base_fields(quest)
+    errors = base.errors
 
     name = quest.name.strip() if quest.name else None
     if name is not None and len(name) > MAX_QUEST_NAME_LENGTH:
@@ -257,8 +309,8 @@ def _validate_quest(quest: Quest) -> tuple[Quest, list[str]]:
 
     normalized = Quest(
         type="Quest",
-        must_use_expression=must_use_expression,
-        more_info=more_info,
+        must_use_expression=base.must_use_expression,
+        more_info=base.more_info,
         has_options=quest.has_options,
         objective=objective,
         name=name,
@@ -267,25 +319,26 @@ def _validate_quest(quest: Quest) -> tuple[Quest, list[str]]:
         reward=reward,
         has_choice=quest.has_choice,
     )
-    return normalized, errors
+    return _IntentValidationResult(normalized=normalized, errors=errors)
 
 
-def _validate_dialogue(dialogue: Dialogue) -> tuple[Dialogue, list[str]]:
+def _validate_dialogue(dialogue: Dialogue) -> _IntentValidationResult[Dialogue]:
     """Validate and normalize a Dialogue instance.
 
     Args:
         dialogue: The Dialogue instance to validate.
 
     Returns:
-        A tuple of (normalized Dialogue, list of error messages).
-        The error list is empty if validation succeeded.
+        An `_IntentValidationResult[Dialogue]` containing the normalized
+        Dialogue and the list of error messages. The error list is empty if
+        validation succeeded.
     """
-    must_use_expression, more_info, errors = _validate_dialogue_base_fields(dialogue)
+    base = _validate_dialogue_base_fields(dialogue)
 
     normalized = Dialogue(
         type="Dialogue",
-        must_use_expression=must_use_expression,
-        more_info=more_info,
+        must_use_expression=base.must_use_expression,
+        more_info=base.more_info,
         has_options=dialogue.has_options,
     )
-    return normalized, errors
+    return _IntentValidationResult(normalized=normalized, errors=base.errors)

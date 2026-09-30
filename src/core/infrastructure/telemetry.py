@@ -6,10 +6,33 @@ import time
 import logging
 import threading
 from dataclasses import dataclass, asdict, field
+from typing import Literal
 from core.helpers.formatters import to_json_format
 
 telemetry_logger = logging.getLogger("telemetry")  # raw log, one line per request
 
+VramSource = Literal["ollama_ps", "nvml", "unavailable"]
+
+@dataclass(frozen=True, slots=True)
+class VramReading:
+    """A snapshot of GPU memory usage and where it was measured.
+
+    Attributes:
+        used_mb: VRAM in use, in megabytes (rounded to 2 decimals), or None
+            if it could not be measured.
+        source: Where the value comes from. "ollama_ps" is the footprint of
+            this specific model as reported by Ollama; "nvml" is the total
+            VRAM in use on GPU 0 as reported by the driver; "unavailable"
+            means no probe succeeded (and `used_mb` is None).
+    """
+
+    used_mb: float | None
+    source: VramSource
+
+    @classmethod
+    def unavailable(cls) -> "VramReading":
+        """Returns a reading representing a failed or unsupported probe."""
+        return cls(used_mb=None, source="unavailable")
 
 @dataclass
 class RequestTelemetry:
@@ -174,9 +197,9 @@ class TelemetryRecorder:
         self.metrics.tokens_generated = completion_tokens
         self.metrics.tokens_source = "usage"
 
-    def set_vram(self, mb: float | None, source: str):
-        self.metrics.vram_allocated_mb = mb
-        self.metrics.vram_source = source
+    def set_vram(self, reading: VramReading) -> None:
+        self.metrics.vram_allocated_mb = reading.used_mb
+        self.metrics.vram_source = reading.source
 
     def __exit__(self, exc_type, exc, tb):
         self.metrics.total_duration_ms = round((time.perf_counter() - self._start) * 1000, 2)
