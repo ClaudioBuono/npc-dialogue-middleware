@@ -21,7 +21,7 @@ def build_orchestrator() -> Orchestrator:
     dialogue_composer = DialogueOutputComposer()
     dialogue_history = DialogueHistory()
     guardrail = Guardrail()
-    refiner = build_refiner(contract_builder=contract_builder, dialogue_composer=dialogue_composer)
+    refiner = build_refiner(contract_builder=contract_builder, dialogue_composer=dialogue_composer, guardrail=guardrail)
 
 
     orchestrator = Orchestrator(
@@ -46,13 +46,13 @@ def build_generate_service(orchestrator: Orchestrator) -> GenerateService:
         dialogue_history=orchestrator.dialogue_history,
     )
 
-def build_refiner(contract_builder: ContractBuilder, dialogue_composer: DialogueOutputComposer) -> Refiner:
+def build_refiner(contract_builder: ContractBuilder, dialogue_composer: DialogueOutputComposer, guardrail: Guardrail) -> Refiner:
     """
     Builds the Refiner.
     """
 
     healer: Healer = Healer(contract_builder, dialogue_composer)
-    judger: Judger = Judger(contract_builder)
+    judger: Judger = Judger(contract_builder, guardrail)
 
 
     return Refiner(

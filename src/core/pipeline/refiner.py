@@ -1,11 +1,13 @@
 from api.schemas import ComposedDialogue
 from core.configuration.settings import Settings
+from core.pipeline.guardrail import Guardrail
 from core.pipeline.healer import Healer
 from core.pipeline.judger import Judger
 from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 from core.types.contexts import GameContext, NPCContext
 from core.types.dataclasses import JudgeIssue
+from core.types.enums import ProfanityMode
 
 
 class Refiner:
@@ -58,9 +60,10 @@ class Refiner:
         Raises:
             MiddlewareError: If the dialogue still has unresolved issues after
                 `self.max_iterations` refinement attempts.
-        """
+        """              
         current_dialogue: ComposedDialogue = composed_dialogue
-
+        
+        
         for _ in range(self.max_iterations):
             issues: list[JudgeIssue] = self.judger.judge_dialogue(current_dialogue, npc_context, game_context)
 

@@ -114,16 +114,6 @@ class Orchestrator:
 
         composed_dialogue = self.refiner.refine_dialogue(composed_dialogue, npc_context, self.game_context)
 
-        # TODO: Integrate in refiner?
-        if Settings().profanity_mode != ProfanityMode.DISABLED:
-            valid_output: bool = self.guardrail.validate_composed_output(composed_dialogue)
-
-            if not valid_output:
-                logger.info(f"Dialogue refused for fairness violation.")
-
-                StateManager().transition_to(MiddlewareState.IDLE)
-                
-                return None
 
         self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
 

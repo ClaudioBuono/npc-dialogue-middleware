@@ -4,11 +4,14 @@ from pydantic import ValidationError
 from api.schemas import ComposedDialogue
 from core.configuration.settings import Settings
 from core.generation.contract_builder import ContractBuilder
+from core.helpers import logger
 from core.helpers.formatters import to_json_format
 from core.llm.openai_client import OpenAICompatibleClient
+from core.pipeline.guardrail import Guardrail
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode, PreProcessingError, ValidationErrorCode
 from core.types.contexts import GameContext, NPCContext
 from core.types.dataclasses import JudgeIssue, JudgeOutput, JudgeProblem, JudgeQuestion
+from core.types.enums import ProfanityMode
 
 
 class Judger:
@@ -17,7 +20,7 @@ class Judger:
 
     Uses an LLM client to execute evaluation contracts and generate structured judgments on NPC dialogues.
     """
-    def __init__(self, contract_builder: ContractBuilder) -> None:
+    def __init__(self, contract_builder: ContractBuilder, guardrail: Guardrail) -> None:
         """Initialize the generator with an optional LLM client.
 
         Args:
@@ -25,6 +28,7 @@ class Judger:
                 May be None if no client is configured.
         """
         self.contract_builder = contract_builder
+        self.guardrail = guardrail
 
 
     def set_client(self, client: OpenAICompatibleClient) -> None:
@@ -71,6 +75,8 @@ class Judger:
             A list of JudgeQuestion instances covering faithfulness,
             consistency, persona consistency, entity check, and language.
         """
+        # TODO: Integrate in refiner?
+                        
         return [
             JudgeQuestion(
                 id="faithfulness",
@@ -165,6 +171,7 @@ class Judger:
             self._check_mandatory_expression(composed_dialogue, npc_context),
             self._check_option_count(composed_dialogue),
             self._check_accept_refuse(composed_dialogue, npc_context),
+            self._check_banned_words(composed_dialogue)
         )
         return [issue for issue in checks if issue is not None]
 
@@ -198,3 +205,11 @@ class Judger:
         if not options or not (options.accept and options.refuse):
             return JudgeIssue(category="Accept/Refuse", issue="Missing Accept/Refuse options")
         return None
+
+    def _check_banned_words(self, composed_dialogue) -> JudgeIssue | None:
+        """
+        Check if the dialogue includes Banned words from the hurtlex lexicon.
+        """
+        if Settings().profanity_mode != ProfanityMode.DISABLED:
+            banned_words = self.guardrail.retrieve_banned_words_in_composed_dialogue(composed_dialogue)
+            return JudgeIssue(category="Banned words", issue=f"Banned words used in the dialogue: {", ".join(banned_words)}")

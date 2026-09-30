@@ -1,7 +1,6 @@
 import logging
 import re
 from threading import Lock
-import time
 from core.configuration.settings import Settings
 from core.types.contexts import GameContext, NPCContext
 from core.types.enums import Language
@@ -44,6 +43,15 @@ class Guardrail:
             self.lexicon_scanner = FastLexiconScanner(terms)
         logger.info(f"Lexicon rebuilt for language {language}")
 
+    def _retrieve_banned_words(self, text: str) -> list[str]:
+        """Return the banned terms found in a string."""
+        scanner = self.lexicon_scanner
+        return scanner.scan(text)
+    
+    def retrieve_banned_words_in_composed_dialogue(self, composed_output: ComposedDialogue) -> list[str]:
+        """Return the banned terms found in a ComposedDialogue."""
+        return self._retrieve_banned_words(self._composed_output_to_text(composed_output))
+
     def _validate_text(self, text_to_validate: str) -> bool:
         """Scan a piece of text against the current lexicon for banned words.
 
@@ -54,12 +62,7 @@ class Guardrail:
             bool: True if no banned terms were found, False otherwise.
         """
         # Scan for banned words
-        start_time = time.perf_counter()
-        with self._scanner_lock:
-            scanner = self.lexicon_scanner
-        scan_result: list[str] = scanner.scan(text_to_validate)
-        execution_time_ms = (time.perf_counter() - start_time) * 1000
-        logger.debug(f"Output scanned in {execution_time_ms}ms.")
+        scan_result = self._retrieve_banned_words(text_to_validate)
         logger.info(f"Fairness scan '{scan_result}'")
 
         return len(scan_result) == 0
@@ -93,29 +96,18 @@ class Guardrail:
         return self._validate_text(text)
 
     def validate_composed_output(self, composed_output: ComposedDialogue) -> bool:
-        """Scans the fields of a ComposedDialogue instance for lexicon violations.
+        """Scan the fields of a ComposedDialogue instance for lexicon violations.
 
         Args:
             composed_output (ComposedDialogue): The composed dialogue object containing
                 text fields and optional dialogue choices to validate.
+
+        Returns:
+            bool: True if no banned terms were found, False otherwise.
         """
+        return not self.retrieve_banned_words_in_composed_dialogue(composed_output)
 
-        # Convert list fields to string, keeping existing strings intact
-        fields = [
-            composed_output.dialogue,
-            (
-                str(composed_output.player_options)
-                if isinstance(composed_output.player_options, list)
-                else composed_output.player_options
-            ),
-        ]
-
-        # Combine all valid string fields into a single text payload for scanning
-        raw_text = " ".join(val for val in fields if isinstance(val, str))
-        
-
-        return self._validate_text(raw_text)
-
+    
     def validate_censor_word(self, censor_word: str) -> bool:
         """Scan a candidate censor word for lexicon violations.
 
@@ -146,6 +138,7 @@ class Guardrail:
         Raises:
             KeyError: if no HurtLex dataset exists for the requested language.
         """
+        
         import pandas as pd
         from core.helpers.paths import resource_path
 
@@ -165,7 +158,26 @@ class Guardrail:
     @staticmethod
     def redact_terms(text: str, terms: list[str]) -> str:
         """Replaces banned words with the word chosen in settings."""
+
         for term in terms:
             pattern = re.compile(rf'\b{re.escape(term)}\b', re.IGNORECASE)
             text = pattern.sub(Settings().censor_word, text)
         return text
+
+    @staticmethod
+    def _composed_output_to_text(composed_output: ComposedDialogue) -> str:
+        """Flatten the scannable fields of a ComposedDialogue into a single string."""
+
+        # Convert list fields to string, keeping existing strings intact
+        fields = [
+            composed_output.dialogue,
+            (
+                str(composed_output.player_options)
+                if isinstance(composed_output.player_options, list)
+                else composed_output.player_options
+            ),
+        ]
+ 
+        # Combine all valid string fields into a single text payload for scanning
+        raw_text = " ".join(val for val in fields if isinstance(val, str))
+        return raw_text
