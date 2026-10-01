@@ -10,7 +10,7 @@ from core.pipeline.guardrail import Guardrail
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode, PreProcessingError, ValidationErrorCode
 from core.types.contexts import Dialogue, GameContext, NPCContext
 from core.types.dataclasses import JudgeIssue, JudgeOutput, JudgeProblem, JudgeQuestion
-from core.types.enums import Language, ProfanityMode
+from core.types.enums import Language
 
 
 class Judger:
@@ -37,7 +37,7 @@ class Judger:
         # Build contract
         persona_questions = self._build_persona_questions()
         option_questions = self._build_rules_questions(npc_context, Settings().language)
-        fairness_questions = self._build_fairness_questions(Settings().prompt_fairness_filter)
+        fairness_questions = self._build_fairness_questions(Settings().fairness_filter)
         judge_questions = persona_questions + option_questions + fairness_questions
         judge_contract = self.contract_builder.build_judge_contract(composed_dialogue, game_context, npc_context, judge_questions)
         print("JUDGE INPUT: ",to_json_format(judge_contract))
@@ -258,7 +258,7 @@ class Judger:
         """
         Check if the dialogue includes Banned words from the hurtlex lexicon.
         """
-        if Settings().profanity_mode != ProfanityMode.DISABLED:
+        if Settings().profanity_filter:
             banned_words = self.guardrail.retrieve_banned_words_in_composed_dialogue(composed_dialogue)
             if len(banned_words) > 0:
                 return JudgeIssue(category="Banned words", issue=f"Banned words used in the dialogue: {", ".join(banned_words)}")

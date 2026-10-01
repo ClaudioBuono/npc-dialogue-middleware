@@ -142,7 +142,7 @@ class ContractBuilder:
 
         prompts.append(GENERAL_RULES_PROMPT)
 
-        if Settings().prompt_fairness_filter:
+        if Settings().fairness_filter:
             prompts.append(FAIRNESS_BASE_RULES_PROMPT)
 
         return "\n\n".join(prompts)

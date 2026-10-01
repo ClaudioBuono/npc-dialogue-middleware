@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Union, Optional
 from core.types.contexts import Dialogue, NPCContext, Quest
-from core.types.enums import Language, ProfanityMode
+from core.types.enums import Language
 
 class DialogueOptionsSchema(BaseModel):
     """
@@ -76,10 +76,6 @@ class MiddlewareStatusResponse(BaseModel):
 class LanguageRequest(BaseModel):
     """Payload for changing the language of the response."""
     language: Language
-
-class ProfanityModeRequest(BaseModel):
-    """Payload for changing the profanity mode of the response."""
-    profanity_mode: ProfanityMode
 
 class ToggleRequest(BaseModel):
     """Generic request body for boolean feature toggles."""

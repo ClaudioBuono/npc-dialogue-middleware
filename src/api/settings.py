@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from api.errors import MIDDLEWARE_ERROR_RESPONSES
-from api.schemas import CensorWordRequest, LanguageRequest, ProfanityModeRequest, ToggleRequest, IntegerRequest, SettingsUpdatedResponse
+from api.schemas import CensorWordRequest, LanguageRequest, ToggleRequest, IntegerRequest, SettingsUpdatedResponse
 from core.configuration.settings import AppSettings, LLMSettings, Settings
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -33,8 +33,8 @@ def change_language(request: LanguageRequest):
     description="Enables or disables the prompt fairness filter applied to incoming requests.",
     responses={200: {"description": "Prompt fairness filter updated successfully."}},
 )
-def toggle_prompt_fairness_filter(request: ToggleRequest):
-    Settings().toggle_prompt_fairness_filter(request.enabled)
+def toggle_fairness_filter(request: ToggleRequest):
+    Settings().toggle_fairness_filter(request.enabled)
     return {"status": "ok"}
 
 @router.post(
@@ -67,8 +67,8 @@ def update_llm_settings(request: LLMSettings):
     description="Updates the default profanity mode used for dialogue generation.",
     responses={200: {"description": "Profanity mode updated successfully."}},
 )
-def update_profanity_mode_settings(request: ProfanityModeRequest):
-    Settings().update_profanity_mode_settings(request.profanity_mode)
+def update_profanity_filter_settings(request: ToggleRequest):
+    Settings().update_profanity_filter_settings(request.enabled)
     return {"status": "ok"}
 
 @router.post(

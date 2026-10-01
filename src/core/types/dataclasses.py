@@ -39,7 +39,6 @@ class DialogueStream:
     """
 
     chunks: Iterator[str]
-    headers: dict[str, str]
 
 
 # TODO: move to a better place

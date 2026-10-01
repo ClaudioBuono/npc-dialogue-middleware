@@ -1,35 +1,45 @@
-# Application settings. Copy this file to settings.yaml to customize it.
+# Middleware settings. Copy this file to settings.yaml to customize it.
 # Missing fields fall back to the defaults defined in AppSettings.
 
-# Language used for the generated dialogue (see the Language enum for valid values)
-# Default: English
+# Language.
+# Language used for the generated dialogue. See the Language enum for valid values.
+# Type: string | Default: "en"
 language: "en"
 
-# Number of player response options generated per turn
-# Default: 2
+# Number of options.
+# Number of player response options generated per turn.
+# Type: integer | Default: 2
 number_of_options: 3
 
-# Enable performance profiling
-# Default: false
+# Profiling.
+# When enabled, performance profiling is turned on.
+# Type: boolean | Default: false
 profiling: false
 
-# Filter prompts to avoid biased or unfair content
-# Default: true
-prompt_fairness_filter: true
+# Fairness filter.
+# When enabled, a fairness instruction is added to the system prompt to avoid
+# biased or unfair content, and fairness questions are included in the judger evaluation.
+# Type: boolean | Default: true
+fairness_filter: true
 
-# How profanity is handled (see the ProfanityMode enum for valid values, e.g. "censor")
-# Default: "stop"
-profanity_mode: "censor"
+# Profanity filter.
+# When enabled, banned words in the generated dialogue are replaced using
+# censor_word. Applies to both StreamMode and GenerateMode.
+# Type: boolean | Default: true
+profanity_filter: true
 
-# Replacement text used when profanity_mode is "censor"
-# Default: "[CENSORED]"
+# Censor word.
+# Replacement text used for banned words when profanity_filter is enabled.
+# Type: string | Default: "[CENSORED]"
 censor_word: "[CENSORED]"
 
-# Maximum number of refinement iterations
-# Default: 3
+# Refiner max iterations.
+# Maximum number of refinement iterations.
+# Type: integer | Default: 3
 refiner_max_iterations: 3
 
 llm:
-  # Sampling temperature, between 0.0 and 2.0
-  # Default: 0.7
+  # Temperature.
+  # Sampling temperature. Lower values give more deterministic output.
+  # Type: float (0.0 to 2.0) | Default: 0.7
   temperature: 0.3

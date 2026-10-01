@@ -9,7 +9,7 @@ from core.infrastructure.state_manager import StateManager
 from core.configuration.settings import Settings
 from core.types.contexts import GameContext, NPCContext
 from core.types.dataclasses import DialogueStream
-from core.types.enums import MiddlewareState, ProfanityMode
+from core.types.enums import MiddlewareState
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 
 logger = logging.getLogger(__name__)
@@ -60,17 +60,6 @@ class GenerateService:
             raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the npc context."])
         return pre_processing.normalize_and_validate_npc_context(npc_context)
 
-    def _profanity_warning_headers(self) -> dict[str, str]:
-        """
-        Return profanity warning headers based on the current settings.
-        """
-        if Settings().profanity_mode == ProfanityMode.STOP:
-            return {
-                "X-Profanity-Mode-Warning": (
-                    "STOP mode profanity filter cannot be used in streaming, continuing dialog in CENSOR mode."
-                )
-            }
-        return {}
 
     # -- Public use cases ------------------------------------------------------
     def set_game_context(self, game_context: GameContext) -> None:
@@ -102,13 +91,12 @@ class GenerateService:
         self._ensure_context_set()
         self._ensure_idle()
 
-        headers = self._profanity_warning_headers()
         npc_context = self._validate_and_normalize_npc_context(npc_context)
 
         self._dialogue_history.clear_dialogue_history()
 
         chunks = self._safe_stream(npc_context, last_player_choice=None)
-        return DialogueStream(chunks, headers)
+        return DialogueStream(chunks)
 
     def continue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> DialogueStream:
         """
@@ -118,11 +106,10 @@ class GenerateService:
         self._ensure_history_not_empty()
         self._ensure_idle()
 
-        headers = self._profanity_warning_headers()
         npc_context = self._validate_and_normalize_npc_context(npc_context)
 
-        chunks = self._safe_stream(npc_context, last_player_choice=None)
-        return DialogueStream(chunks, headers)
+        chunks = self._safe_stream(npc_context, last_player_choice=last_player_choice)
+        return DialogueStream(chunks)
 
     def _safe_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
         """

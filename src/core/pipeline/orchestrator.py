@@ -3,7 +3,6 @@ import logging
 from api.schemas import ComposedDialogue
 from core.pipeline.refiner import Refiner
 from core.infrastructure.state_manager import StateManager
-from core.configuration.settings import Settings
 from core.generation.contract_builder import ContractBuilder
 from core.generation.dialogue_generator import DialogueGenerator
 from core.pipeline.guardrail import Guardrail
@@ -12,8 +11,8 @@ from core.llm.openai_client import OpenAICompatibleClient
 from core.generation.output_composer import DialogueOutputComposer
 from core.routing.router import LLMRouter
 from core.helpers.formatters import to_json_format
-from core.types.contexts import Dialogue, GameContext, NPCContext
-from core.types.enums import MiddlewareState, ProfanityMode
+from core.types.contexts import GameContext, NPCContext
+from core.types.enums import MiddlewareState
 
 logger = logging.getLogger(__name__)
 

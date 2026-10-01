@@ -23,8 +23,3 @@ class MiddlewareState(str, Enum):
     STARTING = "starting" # Initializing the middleware
     SETTING_CONTEXT = "setting_context" # Setting the game context
     GENERATING = "generating" # Generating the dialogue
-
-class ProfanityMode(str, Enum):
-    DISABLED = "disabled"
-    CENSOR = "censor"
-    STOP = "stop"

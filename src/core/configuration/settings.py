@@ -9,7 +9,7 @@ from blinker import Signal
 from pydantic import BaseModel, Field
 
 from core.helpers.paths import resolve_config_file
-from core.types.enums import Language, ProfanityMode
+from core.types.enums import Language
 
 logger = logging.getLogger(__name__)
 
@@ -26,16 +26,15 @@ class AppSettings(BaseModel):
     language: Language = Language.ENGLISH
     llm: LLMSettings = Field(default_factory=LLMSettings)
     profiling: bool = False
-    prompt_fairness_filter: bool = True
-    number_of_options: int = 2
-    profanity_mode: ProfanityMode = ProfanityMode.STOP
+    fairness_filter: bool = True # Fairness Filter in prompt + Judger Questions
+    profanity_filter: bool = True # StreamMode and GenerateMode: censors banned words using censor_word 
     censor_word: str = "[CENSORED]"
     refiner_max_iterations: int = 3
-
+    number_of_options: int = 2
 
 class Settings:
     """Singleton that loads the application configuration from a YAML file
-    and exposes its attributes directly, e.g. Settings().profanity_mode
+    and exposes its attributes directly
 
     Settings.configure(config_dir) must be called once, at application
     startup (main.py), before any other access to Settings().
@@ -158,11 +157,11 @@ class Settings:
         cls.language_changed.send(cls, language=language)
 
     @classmethod
-    def toggle_prompt_fairness_filter(cls, flag: bool) -> None:
+    def toggle_fairness_filter(cls, flag: bool) -> None:
         """Enable or disable the prompt fairness filter and persist it."""
         with cls._lock:
             cls._ensure_loaded()
-            cls._settings.prompt_fairness_filter = flag
+            cls._settings.fairness_filter = flag
             cls._persist()
         logger.info(f"Prompt fairness filter {'ON' if flag else 'OFF'}")
 
@@ -185,13 +184,13 @@ class Settings:
         logger.info(f"LLM settings updated: temperature={llm_settings.temperature}")
 
     @classmethod
-    def update_profanity_mode_settings(cls, profanity_mode: ProfanityMode) -> None:
-        """Replace the profanity mode and persist it."""
+    def update_profanity_filter_settings(cls, profanity_filter: bool) -> None:
+        """Replace the profanity filter and persist it."""
         with cls._lock:
             cls._ensure_loaded()
-            cls._settings.profanity_mode = profanity_mode
+            cls._settings.profanity_filter = profanity_filter
             cls._persist()
-        logger.info(f"Profanity mode setting updated: {profanity_mode.value}")
+        logger.info(f"Profanity filter setting updated: {profanity_filter}")
 
     @classmethod
     def update_censor_word(cls, censor_word: str) -> None:

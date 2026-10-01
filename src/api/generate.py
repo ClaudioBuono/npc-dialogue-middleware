@@ -9,7 +9,7 @@ from core.types.contexts import GameContext, NPCContext
 from api.schemas import ComposedDialogue, DialogueStreamRequest, MiddlewareStatusResponse
 from api.errors import ALL_ERROR_RESPONSES, MIDDLEWARE_ERROR_RESPONSES, PREPROCESSING_ERROR_RESPONSES, ROUTING_CONFIG_ERROR_RESPONSES, error_responses
 from core.types.dataclasses import DialogueStream
-from core.types.enums import MiddlewareState, ProfanityMode
+from core.types.enums import MiddlewareState
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 router = APIRouter(tags=["dialogue"])
 
@@ -100,26 +100,13 @@ def generate_dialogue(npc_context: NPCContext, service: GenerateService = Depend
     description="Streams the generated dialogue line by line to reduce perceived latency for the player, cleaning the dialogue history.",
     responses={
             **ALL_ERROR_RESPONSES,
-            200: {
-                "description": "Stream of dialogue text.",
-                "headers": {
-                    "X-Profanity-Mode-Warning": {
-                        "description": "Warning message when STOP mode profanity filter falls back to CENSOR mode during streaming.",
-                        "type": "string"
-                    }
-                }
-            },
+            200: {"description": "Stream of dialogue text."},
         },
 )
 def start_dialogue_stream(npc_context: NPCContext, service: GenerateService = Depends(get_generate_service)):
-    headers = {}
-    if Settings().profanity_mode == ProfanityMode.STOP:
-        headers["X-Profanity-Mode-Warning"] = (
-            "STOP mode profanity filter cannot be used in streaming, continuing dialog in CENSOR mode."
-        )
 
     result: DialogueStream  = service.start_stream(npc_context)
-    return StreamingResponse(result.chunks, media_type="text/plain", headers=result.headers)
+    return StreamingResponse(result.chunks, media_type="text/plain")
 
 
 @router.post(
@@ -129,24 +116,10 @@ def start_dialogue_stream(npc_context: NPCContext, service: GenerateService = De
     description="Streams the generated dialogue line by line to reduce perceived latency for the player, without cleaning the dialogue history.",
     responses={
         **ALL_ERROR_RESPONSES,
-        200: {
-            "description": "Stream of dialogue text.",
-            "headers": {
-                "X-Profanity-Mode-Warning": {
-                    "description": "Warning message when STOP mode profanity filter falls back to CENSOR mode during streaming.",
-                    "type": "string"
-                }
-            }
+        200: {"description": "Stream of dialogue text."}
         },
-    },
 )
 def continue_dialogue_stream(request: DialogueStreamRequest, service: GenerateService = Depends(get_generate_service)):
-    headers = {}
-    
-    if Settings().profanity_mode == ProfanityMode.STOP:
-        headers["X-Profanity-Mode-Warning"] = (
-            "STOP mode profanity filter cannot be used in streaming, continuing dialog in CENSOR mode."
-        )
 
     result: DialogueStream = service.continue_stream(request.npc_context, request.last_player_choice)
-    return StreamingResponse(result.chunks, media_type="text/plain", headers=result.headers)
+    return StreamingResponse(result.chunks, media_type="text/plain")

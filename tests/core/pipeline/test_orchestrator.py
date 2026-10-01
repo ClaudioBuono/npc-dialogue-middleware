@@ -1,12 +1,11 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from core.configuration.settings import AppSettings, Settings
-from core.infrastructure.state_manager import StateManager
+from core.configuration.settings import AppSettings
 from core.pipeline import orchestrator as orchestrator_module
 from core.pipeline.orchestrator import Orchestrator
 from core.types.contexts import GameContext, NPCContext, Dialogue, Talkativeness
 from api.schemas import ComposedDialogue
-from core.types.enums import MiddlewareState, ProfanityMode
+from core.types.enums import MiddlewareState
 
 @pytest.fixture(autouse=True)
 def reset_orchestrator():
@@ -78,7 +77,7 @@ def test_set_game_context(mock_state_manager, orchestrator, game_context):
     manager_instance.transition_to.assert_any_call(MiddlewareState.IDLE)
 
 def test_generate_dialogue(mock_settings, mock_state_manager, orchestrator, game_context, npc_context):
-    mock_settings.return_value.profanity_mode = ProfanityMode.STOP
+    mock_settings.return_value.profanity_filter = True
     orchestrator.game_context = game_context
 
     contract_mock = MagicMock()
@@ -109,7 +108,7 @@ def test_generate_dialogue(mock_settings, mock_state_manager, orchestrator, game
     orchestrator.guardrail.validate_composed_output.assert_called_once()
 
 def test_generate_dialogue_refused(mock_settings, mock_state_manager, orchestrator, game_context, npc_context):
-    mock_settings.return_value.profanity_mode = ProfanityMode.STOP
+    mock_settings.return_value.profanity_filter = True
     orchestrator.game_context = game_context
     orchestrator.guardrail.validate_composed_output.return_value = False
 
