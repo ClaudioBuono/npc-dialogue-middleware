@@ -1,13 +1,11 @@
 import logging
 import os
 import tempfile
+import yaml
 from pathlib import Path
 from threading import RLock
-
-import yaml
 from blinker import Signal
 from pydantic import BaseModel, Field
-
 from core.helpers.paths import resolve_config_file
 from core.types.enums import Language
 
@@ -27,8 +25,9 @@ class AppSettings(BaseModel):
     llm: LLMSettings = Field(default_factory=LLMSettings)
     profiling: bool = False
     fairness_filter: bool = True # Fairness Filter in prompt + Judger Questions
-    profanity_filter: bool = True # StreamMode and GenerateMode: censors banned words using censor_word 
+    profanity_filter: bool = True  # Stream: censors with censor_word. Generate: refiner questions if refine_dialogue is on, else censors
     censor_word: str = "[CENSORED]"
+    refine_dialogue: bool = True # Enables the refiner in Generate Mode
     refiner_max_iterations: int = 3
     number_of_options: int = 2
 

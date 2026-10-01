@@ -5,7 +5,7 @@ from core.configuration.settings import Settings
 from core.types.contexts import GameContext, NPCContext
 from core.types.enums import Language
 from core.tools.lexicon_scanner import FastLexiconScanner, StreamingLexiconScanner
-from api.schemas import ComposedDialogue
+from api.schemas import ComposedDialogue, DialogueOptionsSchema, QuestChoiceSchema
 from core.tools.lexicon_scanner import StreamingLexiconScanner
 
 logger = logging.getLogger(__name__)
@@ -181,3 +181,30 @@ class Guardrail:
         # Combine all valid string fields into a single text payload for scanning
         raw_text = " ".join(val for val in fields if isinstance(val, str))
         return raw_text
+
+    def censor_composed_dialogue(self, composed_dialogue: ComposedDialogue) -> ComposedDialogue:
+        """Censor the composed dialogue by redacting any terms that are flagged as derogatory."""
+
+        banned_words: list[str] = self.retrieve_banned_words_in_composed_dialogue(composed_dialogue)
+
+        options = composed_dialogue.player_options
+
+        if isinstance(options, QuestChoiceSchema):
+            options = options.model_copy(update={
+                "accept": self.redact_terms(options.accept, banned_words),
+                "refuse": self.redact_terms(options.refuse, banned_words),
+                "dialogue_options": (
+                    [self.redact_terms(o, banned_words) for o in options.dialogue_options]
+                    if options.dialogue_options is not None
+                    else None
+                ),
+            })
+        elif isinstance(options, DialogueOptionsSchema):
+            options = options.model_copy(update={
+                "dialogue_options": [self.redact_terms(o, banned_words) for o in options.dialogue_options],
+            })
+
+        return composed_dialogue.model_copy(update={
+            "dialogue": self.redact_terms(composed_dialogue.dialogue, banned_words),
+            "player_options": options,
+        })

@@ -33,6 +33,14 @@ profanity_filter: true
 # Type: string | Default: "[CENSORED]"
 censor_word: "[CENSORED]"
 
+# Refine dialogue.
+# When enabled in GenerateMode, the dialogue is iteratively refined by the
+# refiner using the judger questions enabled by fairness_filter and
+# profanity_filter, up to refiner_max_iterations passes.
+# Not applicable to StreamMode.
+# Type: boolean | Default: true
+refine_dialogue: true
+
 # Refiner max iterations.
 # Maximum number of refinement iterations.
 # Type: integer | Default: 3

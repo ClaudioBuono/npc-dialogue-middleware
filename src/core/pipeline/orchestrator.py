@@ -1,6 +1,7 @@
 from typing import Any, Optional, Iterator
 import logging
 from api.schemas import ComposedDialogue
+from core.configuration.settings import Settings
 from core.pipeline.refiner import Refiner
 from core.infrastructure.state_manager import StateManager
 from core.generation.contract_builder import ContractBuilder
@@ -86,31 +87,58 @@ class Orchestrator:
         
 
     def generate_dialogue(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> ComposedDialogue | None:
-        """Generate NPC dialogue using the NPC and game context."""
-        
+        """Generate NPC dialogue using the NPC and game context.
+
+        Pipeline: build the prompt contract, generate the raw dialogue with the
+        selected LLM, compose it into a structured ComposedDialogue, then apply
+        either the refiner or the profanity censor, and finally store the result
+        in the dialogue history.
+
+        Args:
+            npc_context: Information about the NPC that is speaking.
+            last_player_choice: The option the player picked in the previous turn,
+                or None if this is the first line of the conversation.
+
+        Returns:
+            The final structured dialogue (text, intent and player options).
+        """
+
         logger.info(f"Generating dialogue for NPC '{npc_context.name}'")
         StateManager().transition_to(MiddlewareState.GENERATING)
 
-
+        # Record the player's reply first, so the contract includes it as context.
         if last_player_choice:
             self.dialogue_history.add_player_dialogue_to_history(last_player_choice)
             logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
 
+        # Build the prompt contract from game state, NPC info and conversation so far.
+        contract = self.contract_builder.build_dialogue_contract(
+            self.game_context, npc_context, self.dialogue_history.get_dialogue_history()
+        )
 
-        contract = self.contract_builder.build_dialogue_contract(self.game_context, npc_context, self.dialogue_history.get_dialogue_history())
-
-        client: OpenAICompatibleClient = self.llm_router.select_model(game_context = self.game_context, npc_context = npc_context)
+        # The router picks the LLM best suited to this NPC and game context.
+        client: OpenAICompatibleClient = self.llm_router.select_model(
+            game_context=self.game_context, npc_context=npc_context
+        )
         logger.debug(f"Selected LLM client: {type(client).__name__}")
 
+        # Generate the raw LLM output, then parse it into a structured dialogue.
         self.dialogue_generator.set_client(client)
         raw_dialogue: str = self.dialogue_generator.generate(contract)
-
         composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, raw_dialogue)
 
-        self.refiner.set_client(client)
+        # Post-processing: the refiner iteratively corrects the dialogue using the
+        # judger questions (which already cover profanity when profanity_filter is on).
+        # Without the refiner, banned words are censored directly with censor_word.
+        # If neither of these are enabled, then the dialogue is returned as-is.
+        if Settings().refine_dialogue:
+            self.refiner.set_client(client)
+            composed_dialogue = self.refiner.refine_dialogue(composed_dialogue, npc_context, self.game_context)
 
-        composed_dialogue = self.refiner.refine_dialogue(composed_dialogue, npc_context, self.game_context)
+        elif Settings().profanity_filter and not Settings().refine_dialogue:
+            composed_dialogue = self.guardrail.censor_composed_dialogue(composed_dialogue)
 
+        # Store the final (post-processed) dialogue so later turns see what the player saw.
         self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
 
         StateManager().transition_to(MiddlewareState.IDLE)
