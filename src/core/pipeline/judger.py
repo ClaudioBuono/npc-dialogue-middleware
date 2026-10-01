@@ -212,4 +212,6 @@ class Judger:
         """
         if Settings().profanity_mode != ProfanityMode.DISABLED:
             banned_words = self.guardrail.retrieve_banned_words_in_composed_dialogue(composed_dialogue)
-            return JudgeIssue(category="Banned words", issue=f"Banned words used in the dialogue: {", ".join(banned_words)}")
+            if len(banned_words) > 0:
+                return JudgeIssue(category="Banned words", issue=f"Banned words used in the dialogue: {", ".join(banned_words)}")
+        return None

@@ -70,6 +70,6 @@ class Refiner:
             if len(issues) == 0:
                 return current_dialogue
 
-            current_dialogue = self.healer.heal_dialogue(composed_dialogue, npc_context, game_context, issues)
+            current_dialogue = self.healer.heal_dialogue(composed_dialogue, game_context, npc_context, issues)
 
         raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["Could not refine the dialogue."])
