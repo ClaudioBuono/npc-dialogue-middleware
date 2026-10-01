@@ -128,10 +128,11 @@ def _format_intent(intent: Union[Quest, Dialogue]) -> str:
     Returns:
         str: Formatted string listing intent metadata, restrictions, and quest fields.
     """
-    lines = [f"- Intent: {intent.type}"]
+    intent_type = str(intent.type)
+    lines = [f"Intent: {intent_type.upper()}"]
 
     if intent.must_use_expression:
-        lines.append(f'- Must include this key message: "{intent.must_use_expression}"')
+        lines.append(f'- MUST USE the following expression: "{intent.must_use_expression}"')
     if intent.more_info:
         lines.append(f"- Additional context: {intent.more_info}")
     lines.append(f"- Should offer extra dialogue options: {'yes' if intent.has_options else 'no'}")
@@ -182,7 +183,7 @@ def _format_player_options(player_options) -> str:
     return ""
 
 
-def format_npc_content(npc_context: NPCContext) -> str:
+def format_npc_context(npc_context: NPCContext) -> str:
     """Format an NPCContext instance into human-readable text for an LLM prompt.
 
     Renders the NPC's core profile (name, age, personality, current state, relationship
@@ -213,6 +214,7 @@ def format_npc_content(npc_context: NPCContext) -> str:
     if npc_context.language:
         lines.append(f"- Spoken languages: {', '.join(npc_context.language)}")
 
+    lines.append(_format_intent(npc_context.intent))
     npc_block = "\n".join(lines)
 
     return f"{npc_block}"

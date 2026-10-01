@@ -1,7 +1,7 @@
 from typing import Any, Dict
 from api.schemas import ComposedDialogue
 from core.configuration.settings import Settings
-from core.helpers.formatters import format_composed_dialogue, format_dialogue_history, format_game_context, format_judge_issues, format_judge_questions, format_npc_content
+from core.helpers.formatters import format_composed_dialogue, format_dialogue_history, format_game_context, format_judge_issues, format_judge_questions, format_npc_context
 from core.types.dataclasses import Contract, JudgeIssue, JudgeQuestion
 from core.types.contexts import *
 from core.llm.prompts import *
@@ -390,7 +390,7 @@ class ContractBuilder:
         Builds the user prompt for the Judge, which includes the formatted dialogue, NPC context, game context, and judge questions.
         """
         formatted_dialogue = format_composed_dialogue(composed_dialogue)
-        formatted_npc_context = format_npc_content(npc_context)
+        formatted_npc_context = format_npc_context(npc_context)
         formatted_game_context = format_game_context(game_context)
 
         judge_body_prompt = JUDGE_BODY_TEMPLATE.format(
@@ -478,7 +478,7 @@ class ContractBuilder:
         Builds the user prompt for the Healer, which includes the formatted dialogue, game context, NPC context, judge found issues.
         """
         formatted_dialogue = format_composed_dialogue(composed_dialogue)
-        formatted_npc_context = format_npc_content(npc_context)
+        formatted_npc_context = format_npc_context(npc_context)
         formatted_game_context = format_game_context(game_context)
 
         healer_body_prompt = HEALER_BODY_TEMPLATE.format(

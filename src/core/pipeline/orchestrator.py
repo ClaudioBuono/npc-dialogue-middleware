@@ -87,11 +87,9 @@ class Orchestrator:
         
 
     def generate_dialogue(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> ComposedDialogue | None:
-        
         """Generate NPC dialogue using the NPC and game context."""
-
+        
         logger.info(f"Generating dialogue for NPC '{npc_context.name}'")
-            
         StateManager().transition_to(MiddlewareState.GENERATING)
 
 
