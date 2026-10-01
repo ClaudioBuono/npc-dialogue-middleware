@@ -4,14 +4,13 @@ from pydantic import ValidationError
 from api.schemas import ComposedDialogue
 from core.configuration.settings import Settings
 from core.generation.contract_builder import ContractBuilder
-from core.helpers import logger
 from core.helpers.formatters import to_json_format
 from core.llm.openai_client import OpenAICompatibleClient
 from core.pipeline.guardrail import Guardrail
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode, PreProcessingError, ValidationErrorCode
-from core.types.contexts import GameContext, NPCContext
+from core.types.contexts import Dialogue, GameContext, NPCContext
 from core.types.dataclasses import JudgeIssue, JudgeOutput, JudgeProblem, JudgeQuestion
-from core.types.enums import ProfanityMode
+from core.types.enums import Language, ProfanityMode
 
 
 class Judger:
@@ -36,9 +35,13 @@ class Judger:
 
     def judge_dialogue(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext, game_context: GameContext) -> list[JudgeIssue]:
         # Build contract
-        judge_questions = self._build_questions(Settings().language.name)
+        persona_questions = self._build_persona_questions()
+        option_questions = self._build_rules_questions(npc_context, Settings().language)
+        fairness_questions = self._build_fairness_questions(Settings().prompt_fairness_filter)
+        judge_questions = persona_questions + option_questions + fairness_questions
         judge_contract = self.contract_builder.build_judge_contract(composed_dialogue, game_context, npc_context, judge_questions)
         print("JUDGE INPUT: ",to_json_format(judge_contract))
+        
         # Parse response and check its validity 
         judge_output_raw = self._client.generate(judge_contract, temperature = 0.3) # TODO: Test higher temperatures
         try:
@@ -59,7 +62,7 @@ class Judger:
         return issues + static_issues
 
     # Helper methods --------------------------------------------------------------------------------
-    def _build_questions(self, default_language: str) -> list[JudgeQuestion]:
+    def _build_persona_questions(self) -> list[JudgeQuestion]:
         """Build the standard set of judge questions used to evaluate dialogue.
 
         Each question targets a specific quality dimension of the generated
@@ -98,19 +101,64 @@ class Judger:
                 text="Are all named entities in the dialogue (people, places, items, "
                 "factions) either present in the context or plausible within it?",
             ),
-            JudgeQuestion(
-                id="language",
-                text=f"Is the entire dialogue written in {default_language}, with no other language mixed in?",
-            ),
-            JudgeQuestion(
-                id="fairness",
-                text="Is the dialogue free from stereotypes, discriminatory language, "
-                "or biased characterizations based on gender, ethnicity, religion, "
-                "age, or other identity traits, unless explicitly justified by the "
-                "NPC's established persona or narrative role?",
-            ),
         ]
     
+    # options non devono essere acept/refuse
+    # accept e refuse effettivamente facciano intedere accept/refuse
+    def _build_rules_questions(self, npc_context: NPCContext, current_language: Language) -> list[JudgeQuestion]:
+        language_output: str = current_language.name
+        rules_questions: list[JudgeQuestion] = [
+            JudgeQuestion(
+                id="language",
+                text=f"Is the entire dialogue written in {language_output}, with no other language mixed in?",
+            ),
+            JudgeQuestion(
+                id="no_narration",
+                text=(
+                    "Is the line written purely as words spoken aloud by the NPC, "
+                    "in first person, with no narration? It should NOT contain "
+                    "third-person descriptions (e.g. 'he sighs'), stage directions or "
+                    "actions (e.g. '*laughs*', '(nods)'), or references to ambient "
+                    "sounds and the environment (e.g. 'the wind howls')."
+                )
+            )
+        ]
+
+        if isinstance(npc_context.intent, Dialogue):
+            return rules_questions
+
+        if npc_context.intent.has_choice:
+            choice_question = JudgeQuestion(
+                id="consistent_choices",
+                text="Is accept choice actually refering to something that could intend accepting a quest? Is the same happening for refuse?"
+            )
+            rules_questions.append(choice_question)
+
+        if npc_context.intent.has_options:
+            options_questions = JudgeQuestion(
+                id="consistent_options",
+                text="Are options not refering to something that could intend accepting a quest?"
+            )
+            rules_questions.append(options_questions)
+
+        return rules_questions
+
+    # TODO: Improve fairness detection
+    def _build_fairness_questions(self, filter: bool) -> list[JudgeQuestion]:
+        if filter:
+            return [
+                JudgeQuestion(
+                    id="fairness",
+                    text="Is the dialogue free from stereotypes, discriminatory language, "
+                    "or biased characterizations based on gender, ethnicity, religion, "
+                    "age, or other identity traits, unless explicitly justified by the "
+                    "NPC's established persona or narrative role?",
+                )
+            ]
+
+        return []
+
+
     def _check_valid_response(self, response: list[JudgeOutput], questions: list[JudgeQuestion]) -> bool:
         """Check that the judge's response covers exactly the expected questions.
 

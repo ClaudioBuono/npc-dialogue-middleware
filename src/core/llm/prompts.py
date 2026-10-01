@@ -133,6 +133,7 @@ JUDGE_BASE_PROMPT = inspect.cleandoc("""
 JUDGE_TASK_TEMPLATE = inspect.cleandoc("""
     Answer the following questions about the dialogue, using only the game
     context, NPC context, and dialogue provided below.
+    
     QUESTIONS:
     {questions}
 """)
