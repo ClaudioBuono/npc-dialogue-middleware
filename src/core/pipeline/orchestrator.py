@@ -114,7 +114,6 @@ class Orchestrator:
 
         composed_dialogue = self.refiner.refine_dialogue(composed_dialogue, npc_context, self.game_context)
 
-
         self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
 
         StateManager().transition_to(MiddlewareState.IDLE)
@@ -124,84 +123,80 @@ class Orchestrator:
         return composed_dialogue
 
     
-    # TODO: Refactor to reduce complexity
     def generate_dialogue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
         """Generate NPC dialogue using the NPC and game context via streaming."""
 
         StateManager().transition_to(MiddlewareState.GENERATING)
         logger.info(f"Generating dialogue stream for NPC '{npc_context.name}'")
 
+        try:
+            raw_stream = self._start_dialogue_stream(npc_context, last_player_choice)
+
+            released: list[str] = []
+            for text in self._guarded_stream(raw_stream):
+                released.append(text)
+                yield text
+
+            self._save_streamed_dialogue(npc_context, "".join(released))
+        finally:
+            StateManager().transition_to(MiddlewareState.IDLE)
+
+    def _start_dialogue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
+        """Update history, build the contract, select the client and start the raw stream."""
         if last_player_choice:
             self.dialogue_history.add_player_dialogue_to_history(last_player_choice)
             logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
 
-        contract = self.contract_builder.build_dialogue_contract(self.game_context, npc_context, self.dialogue_history.get_dialogue_history())
+        contract = self.contract_builder.build_dialogue_contract(
+            self.game_context, npc_context, self.dialogue_history.get_dialogue_history()
+        )
 
-        client: OpenAICompatibleClient = self.llm_router.select_model(game_context=self.game_context, npc_context=npc_context)
+        client: OpenAICompatibleClient = self.llm_router.select_model(
+            game_context=self.game_context, npc_context=npc_context
+        )
         logger.debug(f"Selected LLM client: {type(client).__name__}")
 
         self.dialogue_generator.set_client(client)
-        stream = self.dialogue_generator.generate_stream(contract)
+        return self.dialogue_generator.generate_stream(contract)
 
-        scanner = None
-        max_len = 0
-       
+    def _guarded_stream(self, stream: Iterator[str]) -> Iterator[str]:
+        """
+        Filter the stream through the guardrail scanner using a sliding window.
+
+        The last `max_len` characters are held back, because a forbidden term may be
+        split across two chunks. Without a scanner the window is 0 and every chunk
+        is released immediately.
+        """
         scanner = self.guardrail.get_streaming_scanner()
-        max_len = getattr(scanner, "_max_len", 0)
+        max_len = getattr(scanner, "_max_len", 0) if scanner else 0
+        buffer = ""
 
-        full_dialogue = ""
-        refused = False
-        output_buffer = ""
+        for chunk in filter(None, stream):
+            matches = scanner.feed(chunk) if scanner else None
+            buffer += chunk
 
-        
-        for chunk in stream:
-            if not chunk:
-                continue
+            if matches:
+                logger.info(f"Chunk redacted for fairness violation. Matches: {matches}")
+                buffer = self.guardrail.redact_terms(buffer, matches)
 
-            if scanner:
-                matches = scanner.feed(chunk)
-                output_buffer += chunk
+            safe_len = len(buffer) - max_len
+            if safe_len > 0:
+                yield buffer[:safe_len]
+                buffer = buffer[safe_len:]
 
-                if matches:
-                        logger.info(f"Chunk redacted for fairness violation. Matches: {matches}")
-                        output_buffer = self.guardrail.redact_terms(output_buffer, matches)
-                        refused = True
+        pending = scanner.flush() if scanner else None
+        if pending:
+            logger.info(f"Stream redacted for fairness violation at end of stream. Matches: {pending}")
+            buffer = self.guardrail.redact_terms(buffer, pending)
 
-                safe_len = len(output_buffer) - max_len
-                if safe_len > 0:
-                    to_release = output_buffer[:safe_len]
-                    full_dialogue += to_release
-                    yield to_release
-                    output_buffer = output_buffer[safe_len:]
-            else:
-                full_dialogue += chunk
-                yield chunk
+        if buffer:
+            yield buffer
 
-        if scanner:
-            pending_matches = scanner.flush()
-            if pending_matches:
-                logger.info(f"Dialogue stream redacted for fairness violation at end of stream. Matches: {pending_matches}")
-                output_buffer = self.guardrail.redact_terms(output_buffer, pending_matches)
-                refused = True
-
-            if output_buffer:
-                full_dialogue += output_buffer
-                yield output_buffer
-
-
-        if not refused:
-            try:
-                composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, full_dialogue)
-                self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
-                StateManager().transition_to(MiddlewareState.IDLE)
-                logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
-            except Exception as e:
-                logger.error(f"Failed to compose dialogue after stream: {e}")
-        else:
-            try:
-                composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, full_dialogue)
-                self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
-                StateManager().transition_to(MiddlewareState.IDLE)
-            except Exception as e:
-                StateManager().transition_to(MiddlewareState.IDLE)
-                logger.error(f"Failed to compose dialogue after refused stream: {e}")
+    def _save_streamed_dialogue(self, npc_context: NPCContext, full_dialogue: str) -> None:
+        """Compose the full dialogue and store it in history. Never raises."""
+        try:
+            composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, full_dialogue)
+            self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
+            logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
+        except Exception:
+            logger.exception("Failed to compose dialogue after stream")
