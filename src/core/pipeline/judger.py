@@ -43,7 +43,7 @@ class Judger:
         print("JUDGE INPUT: ",to_json_format(judge_contract))
         
         # Parse response and check its validity 
-        judge_output_raw = self._client.generate(judge_contract, temperature = 0.3) # TODO: Test higher temperatures
+        judge_output_raw = self._client.generate(judge_contract, Settings().judger_temperature) # TODO: Test higher temperatures
         try:
             judge_output = JudgeOutput.model_validate_json(judge_output_raw)
             print("JUDGE RESULT: ",to_json_format(judge_output))

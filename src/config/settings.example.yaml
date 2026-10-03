@@ -47,7 +47,20 @@ refine_dialogue: true
 refiner_max_iterations: 3
 
 llm:
-  # Temperature.
-  # Sampling temperature. Lower values give more deterministic output.
-  # Type: float (0.0 to 2.0) | Default: 0.7
-  temperature: 0.3
+  # Sampling temperature for each LLM role (range: 0.0 to 2.0).
+  # Lower = more deterministic and consistent, higher = more varied and creative.
+
+  # Generates the dialogue.
+  # Higher values give more varied, creative lines; lower values give safer, more predictable ones.
+  # Default: 0.7
+  dialogue_generator_temperature: 0.3
+
+  # Evaluates the generated dialogue.
+  # Keep it low so scoring stays consistent and repeatable across runs.
+  # Default: 0.2
+  judger_temperature: 0.3
+
+  # Fixes and refines dialogue that failed evaluation.
+  # A moderate value lets it rewrite lines without drifting too far from the original.
+  # Default: 0.4
+  healer_temperature: 0.5

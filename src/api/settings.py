@@ -53,7 +53,7 @@ def set_number_of_options(request: IntegerRequest):
     "/llm",
     response_model=SettingsUpdatedResponse,
     summary="Update LLM Settings",
-    description="Updates the default temperature and max tokens used for dialogue generation.",
+    description="Updates the temperatures for dialogue generation and refinement.",
     responses={200: {"description": "LLM settings updated successfully."}},
 )
 def update_llm_settings(request: LLMSettings):

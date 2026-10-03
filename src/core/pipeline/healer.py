@@ -61,7 +61,7 @@ class Healer:
 
         # Slightly higher temperature than the judge: the healer needs to
         # rewrite naturally, not just reproduce a deterministic pattern.
-        healer_output_raw = self._client.generate(healer_contract, temperature = Settings().llm.temperature) # TODO: Test lower temperatures
+        healer_output_raw = self._client.generate(healer_contract, temperature = Settings().llm.healer_temperature) # TODO: Test lower temperatures
 
         try:
             # Re-validates the healed dialogue against the same schema as

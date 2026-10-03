@@ -15,14 +15,16 @@ logger = logging.getLogger(__name__)
 class LLMSettings(BaseModel):
     """Configuration for the language model used to generate dialogue."""
 
-    temperature: float = Field(0.7, ge=0.0, le=2.0)
+    dialogue_generator_temperature: float = Field(0.7, ge=0.0, le=2.0)
+    judger_temperature: float = Field(0.2, ge=0.0, le=2.0)
+    healer_temperature: float = Field(0.4, ge=0.0, le=2.0)
 
 
 class AppSettings(BaseModel):
     """User-configurable application settings, loaded from settings.yaml."""
 
-    language: Language = Language.ENGLISH
     llm: LLMSettings = Field(default_factory=LLMSettings)
+    language: Language = Language.ENGLISH
     profiling: bool = False
     fairness_filter: bool = True # Fairness Filter in prompt + Judger Questions
     profanity_filter: bool = True  # Stream: censors with censor_word. Generate: refiner questions if refine_dialogue is on, else censors
@@ -180,7 +182,7 @@ class Settings:
             cls._ensure_loaded()
             cls._settings.llm = llm_settings
             cls._persist()
-        logger.info(f"LLM settings updated: temperature={llm_settings.temperature}")
+        logger.info(f"LLM settings updated: {llm_settings}")
 
     @classmethod
     def update_profanity_filter_settings(cls, profanity_filter: bool) -> None:

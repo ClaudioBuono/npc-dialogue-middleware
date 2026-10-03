@@ -80,7 +80,7 @@ def test_heal_dialogue_calls_client_with_correct_args(healer, mock_contract_buil
     healer.heal_dialogue(original_dialogue, game_ctx, npc_ctx, issues)
 
     expected_contract = mock_contract_builder.build_healer_contract.return_value
-    mock_client.generate.assert_called_once_with(expected_contract, temperature=Settings().llm.temperature)
+    mock_client.generate.assert_called_once_with(expected_contract, temperature=Settings().llm.dialogue_generator_temperature)
 
 def test_heal_dialogue_with_no_issues(healer, mock_contract_builder, mock_dialogue_composer, dummy_contexts):
     """An empty issues list is a legitimate edge case (e.g. called
