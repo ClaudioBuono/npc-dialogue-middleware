@@ -71,7 +71,7 @@ NPC_CONTEXT = NPCContext(
 
 DIALOGUE_TEXT = (
     "You can't trust persone from the coastal provinces with a contract, "
-    "sneaky by nature, always has been, always will be."
+    "sneaky by nature, always has been, always will be, fuck you."
 )
 
 COMPOSED_DIALOGUE = ComposedDialogue(intent=Dialogue(), dialogue=DIALOGUE_TEXT)
@@ -90,9 +90,6 @@ def main() -> None:
     print(f"Selected model client: {type(client).__name__}")
     orchestrator.refiner.set_client(client)
 
-    # Judger.judge_dialogue prints "JUDGE INPUT:" and "JUDGE RESULT:"
-    # internally (see core/judger.py) -- the full prompt and raw model
-    # response show up automatically above the lines below.
     issues = orchestrator.refiner.judger.judge_dialogue(COMPOSED_DIALOGUE, NPC_CONTEXT, GAME_CONTEXT)
 
     print("\n--- Parsed issues ---")
