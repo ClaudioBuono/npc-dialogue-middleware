@@ -31,7 +31,7 @@ class Refiner:
         """
         self.healer = healer
         self.judger = judger
-        self.max_iterations = Settings().refiner_max_iterations
+        self.max_iterations = Settings().refiner_max_iterations # TODO: Change name to match current semantic meaning?
 
     def set_client(self, client: OpenAICompatibleClient):
         """Propagate the LLM client to the underlying healer and judger.
@@ -69,6 +69,7 @@ class Refiner:
         current_dialogue: ComposedDialogue = composed_dialogue
         issues: list[JudgeIssue] = []
 
+        # N max_terations => N+1 judges and N heals
         for i in range(1, self.max_iterations + 1):
             logger.info("Iteration %d/%d: judging", i, self.max_iterations)
             issues = self.judger.judge_dialogue(current_dialogue, npc_context, game_context)
@@ -80,11 +81,14 @@ class Refiner:
                 )
                 return current_dialogue
 
+            if i == self.max_iterations:
+                break # No more heals left
+
             logger.info(
                 "Iteration %d/%d: %d issues (%s), healing",
                 i, self.max_iterations, len(issues), ", ".join(x.category for x in issues),
             )
-            current_dialogue = self.healer.heal_dialogue(composed_dialogue, game_context, npc_context, issues)
+            current_dialogue = self.healer.heal_dialogue(current_dialogue, game_context, npc_context, issues)
 
         logger.error(
             "Refinement failed after %d iterations in %.2fs. Unresolved issues from last judgment: %s",
