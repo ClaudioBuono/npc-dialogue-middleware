@@ -218,7 +218,7 @@ class Judger:
         """
         Check if the dialogue includes Banned words from the hurtlex lexicon.
         """
-        if Settings().profanity_filter:
+        if not Settings().profanity_filter:
             logger.debug("Banned words check skipped (profanity_filter=%s)", Settings().profanity_filter)
             return None
         
