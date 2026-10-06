@@ -1,5 +1,6 @@
 from __future__ import annotations
-from pprint import pprint 
+import logging
+import time 
 from pydantic import ValidationError
 from api.schemas import ComposedDialogue
 from core.configuration.settings import Settings
@@ -13,6 +14,7 @@ from core.types.contexts import Dialogue, GameContext, NPCContext
 from core.types.dataclasses import JudgeIssue, JudgeOutput, JudgeProblem, JudgeQuestion
 from core.types.enums import Language
 
+logger = logging.getLogger(__name__)
 
 class Judger:
     """
@@ -42,29 +44,68 @@ class Judger:
             fairness=Settings().fairness_filter,
             profanity=Settings().profanity_filter,
         )
+        logger.info(
+            "Judging dialogue: %d questions (%s), language=%s",
+            len(judge_questions), ", ".join(q.id for q in judge_questions), Settings().language.name,
+        )
 
         judge_contract = self.contract_builder.build_judge_contract(composed_dialogue, game_context, npc_context, judge_questions)
 
-        print("JUDGE INPUT: ",to_json_format(judge_contract))
-        
-        # Parse response and check its validity 
-        judge_output_raw = self._client.generate(judge_contract, Settings().llm.judger_temperature) # TODO: Test higher temperatures
+        try:
+            judge_output_raw = self._client.generate(judge_contract, Settings().llm.judger_temperature) # TODO: Test higher temperatures
+        except Exception:
+            logger.exception("Judge LLM call failed")
+            raise
+
         try:
             judge_output = JudgeOutput.model_validate_json(judge_output_raw)
-            print("JUDGE RESULT: ",to_json_format(judge_output))
         except ValidationError as e:
-            raise PreProcessingError(code=ValidationErrorCode.INVALID_VALUE, errors=[f"Judge output does not match expected schema: {e}", f"Raw output: {judge_output_raw}"])
-        
+            logger.error(
+                "Judge output does not match schema (%d validation errors). Raw output: %s",
+                e.error_count(), judge_output_raw,
+            )
+            raise PreProcessingError(
+                code=ValidationErrorCode.INVALID_VALUE,
+                errors=[f"Judge output does not match expected schema: {e}", f"Raw output: {judge_output_raw}"],
+            )
+
         if not self._check_valid_response(judge_output, judge_questions):
-            raise MiddlewareError(code=MiddlewareErrorCode.INVALID_RESPONSE, errors=["There was a problem during the judging process."])
+            expected = {q.id for q in judge_questions}
+            received = {a.id for a in judge_output.answers}
+            logger.error(
+                "Judge response mismatch: missing=%s, unexpected=%s, expected_count=%d, received_count=%d",
+                sorted(expected - received), sorted(received - expected),
+                len(judge_questions), len(judge_output.answers),
+            )
+            raise MiddlewareError(
+                code=MiddlewareErrorCode.INVALID_RESPONSE,
+                errors=["There was a problem during the judging process."],
+            )
 
         # Extract problems (where the answer is False)
         judge_problems: list[JudgeProblem] = [p for p in judge_output.answers if not p.answer]
+        logger.info(
+            "LLM judge: %d/%d checks failed%s",
+            len(judge_problems), len(judge_output.answers),
+            f" ({', '.join(p.id for p in judge_problems)})" if judge_problems else "",
+        )
 
         # Build issues array
-        issues = self._map_judge_issues(judge_problems)
+        llm_issues = self._map_judge_issues(judge_problems)
         static_issues = self._judge_static_format(composed_dialogue, npc_context)
-        return issues + static_issues
+        issues = llm_issues + static_issues
+
+        if issues:
+            logger.info(
+                "Judgment: %d issue(s) (llm=%d, static=%d): %s",
+                len(issues), len(llm_issues), len(static_issues),
+                ", ".join(i.category for i in issues),
+            )
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("Issue details: %s", to_json_format(issues))
+        else:
+            logger.info("Judgment: no issues")
+        return issues
 
     # Helper methods --------------------------------------------------------------------------------
 
@@ -128,9 +169,11 @@ class Judger:
             self._check_mandatory_expression(composed_dialogue, npc_context),
             self._check_option_count(composed_dialogue),
             self._check_accept_refuse(composed_dialogue, npc_context),
-            self._check_banned_words(composed_dialogue)
+            self._check_banned_words(composed_dialogue),
         )
-        return [issue for issue in checks if issue is not None]
+        issues = [issue for issue in checks if issue is not None]
+        logger.debug("Static checks: %d/%d violated", len(issues), len(checks))
+        return issues
 
     def _check_mandatory_expression(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext) -> JudgeIssue | None:
         """
@@ -138,6 +181,7 @@ class Judger:
         """
         expression = npc_context.intent.must_use_expression
         if expression and expression not in composed_dialogue.dialogue:
+            logger.debug("Mandatory expression %r not found in dialogue", expression)
             return JudgeIssue(category="Must use expression", issue="Expression is not used in dialogue")
         return None
 
@@ -148,8 +192,11 @@ class Judger:
         options = composed_dialogue.player_options
         if not options or not options.dialogue_options:
             return None
-        if len(options.dialogue_options) != Settings().number_of_options:
-            return JudgeIssue(category="Number of options", issue="Incorrect number of options")
+        expected = Settings().number_of_options
+        actual = len(options.dialogue_options)
+        if actual != expected:
+            logger.debug("Option count mismatch: expected=%d, actual=%d", expected, actual)
+            return JudgeIssue(category="Number of options", issue=f"Incorrect number of options: expected {expected}, got {actual}")
         return None
 
     def _check_accept_refuse(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext) -> JudgeIssue | None:
@@ -160,6 +207,10 @@ class Judger:
             return None
         options = composed_dialogue.player_options
         if not options or not (options.accept and options.refuse):
+            logger.debug(
+                "Accept/Refuse missing: accept=%s, refuse=%s",
+                bool(options and options.accept), bool(options and options.refuse),
+            )
             return JudgeIssue(category="Accept/Refuse", issue="Missing Accept/Refuse options")
         return None
 
@@ -168,7 +219,12 @@ class Judger:
         Check if the dialogue includes Banned words from the hurtlex lexicon.
         """
         if Settings().profanity_filter:
-            banned_words = self.guardrail.retrieve_banned_words_in_composed_dialogue(composed_dialogue)
-            if len(banned_words) > 0:
-                return JudgeIssue(category="Banned words", issue=f"Banned words used in the dialogue: {", ".join(banned_words)}")
+            logger.debug("Banned words check skipped (profanity_filter=%s)", Settings().profanity_filter)
+            return None
+        
+        banned_words = self.guardrail.retrieve_banned_words_in_composed_dialogue(composed_dialogue)
+        if banned_words:
+            joined = ", ".join(banned_words)
+            logger.debug("Banned words found: %s", joined)
+            return JudgeIssue(category="Banned words", issue=f"Banned words used in the dialogue: {joined}")
         return None

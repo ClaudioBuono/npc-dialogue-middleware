@@ -214,7 +214,6 @@ def format_npc_context(npc_context: NPCContext) -> str:
     if npc_context.language:
         lines.append(f"- Spoken languages: {', '.join(npc_context.language)}")
 
-    lines.append(_format_intent(npc_context.intent))
     npc_block = "\n".join(lines)
 
     return f"{npc_block}"

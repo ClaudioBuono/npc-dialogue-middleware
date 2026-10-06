@@ -1,3 +1,6 @@
+import logging
+import time
+
 from api.schemas import ComposedDialogue
 from core.configuration.settings import Settings
 from core.pipeline.healer import Healer
@@ -7,6 +10,7 @@ from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 from core.types.contexts import GameContext, NPCContext
 from core.types.dataclasses import JudgeIssue
 
+logger = logging.getLogger(__name__)
 
 class Refiner:
     """Orchestrates the iterative refinement of a composed dialogue.
@@ -58,16 +62,32 @@ class Refiner:
         Raises:
             MiddlewareError: If the dialogue still has unresolved issues after
                 `self.max_iterations` refinement attempts.
-        """              
-        current_dialogue: ComposedDialogue = composed_dialogue
-        
-        
-        for _ in range(self.max_iterations):
-            issues: list[JudgeIssue] = self.judger.judge_dialogue(current_dialogue, npc_context, game_context)
+        """
+        start = time.perf_counter()
+        logger.info("Starting refinement (max %d iterations)", self.max_iterations)
 
-            if len(issues) == 0:
+        current_dialogue: ComposedDialogue = composed_dialogue
+        issues: list[JudgeIssue] = []
+
+        for i in range(1, self.max_iterations + 1):
+            logger.info("Iteration %d/%d: judging", i, self.max_iterations)
+            issues = self.judger.judge_dialogue(current_dialogue, npc_context, game_context)
+
+            if not issues:
+                logger.info(
+                    "Dialogue accepted after %d iteration(s) in %.2fs",
+                    i, time.perf_counter() - start,
+                )
                 return current_dialogue
 
+            logger.info(
+                "Iteration %d/%d: %d issues (%s), healing",
+                i, self.max_iterations, len(issues), ", ".join(x.category for x in issues),
+            )
             current_dialogue = self.healer.heal_dialogue(composed_dialogue, game_context, npc_context, issues)
 
+        logger.error(
+            "Refinement failed after %d iterations in %.2fs. Unresolved issues from last judgment: %s",
+            self.max_iterations, time.perf_counter() - start, ", ".join(x.category for x in issues),
+        )
         raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["Could not refine the dialogue."])

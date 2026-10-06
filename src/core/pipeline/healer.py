@@ -1,15 +1,19 @@
 from __future__ import annotations
+import logging
+import time
 from pydantic import ValidationError
 from api.schemas import ComposedDialogue
 from core.configuration.settings import Settings
 from core.generation.contract_builder import ContractBuilder
 from core.generation.output_composer import DialogueOutputComposer
+from core.helpers.formatters import format_composed_dialogue
 from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.errors import PreProcessingError, ValidationErrorCode
 from core.tools.errors import PreProcessingError
 from core.types.contexts import GameContext, NPCContext
 from core.types.dataclasses import JudgeIssue
 
+logger = logging.getLogger(__name__)
 
 class Healer:
     """
@@ -40,36 +44,30 @@ class Healer:
 
 
     def heal_dialogue(self, composed_dialogue: ComposedDialogue, game_context: GameContext, npc_context: NPCContext, issues: list[JudgeIssue]) -> ComposedDialogue:
-        """Rewrite the dialogue to resolve the given issues.
+        logger.info(
+            "Healing dialogue: %d issue(s) (%s)",
+            len(issues), ", ".join(i.category for i in issues),
+        )
 
-        Args:
-            composed_dialogue: The dialogue to repair, as originally composed.
-            game_context: Global world/setting context, used to keep the
-                rewrite grounded.
-            npc_context: The NPC's profile (persona, tone, relation to the
-                player), used to keep the rewrite in character.
-            issues: The problems flagged by the judge that the healer must fix.
-
-        Returns:
-            A new ComposedDialogue with the flagged issues resolved.
-
-        Raises:
-            PreProcessingError: If the healer's raw output does not match
-                the expected schema once parsed.
-        """
         healer_contract = self.contract_builder.build_healer_contract(composed_dialogue, game_context, npc_context, issues)
 
-        # Slightly higher temperature than the judge: the healer needs to
-        # rewrite naturally, not just reproduce a deterministic pattern.
-        healer_output_raw = self._client.generate(healer_contract, temperature = Settings().llm.healer_temperature) # TODO: Test lower temperatures
+        try:
+            healer_output_raw = self._client.generate(healer_contract, temperature=Settings().llm.healer_temperature)  # invariato
+        except Exception:
+            logger.exception("Healer LLM call failed")
+            raise
 
         try:
-            # Re-validates the healed dialogue against the same schema as
-            # the original composition step, so a malformed healer output
-            # never silently reaches the rest of the pipeline.
             composed_dialogue = self.dialogue_composer.compose_dialogue(npc_context, healer_output_raw)
-
         except ValidationError as e:
-            raise PreProcessingError(code=ValidationErrorCode.INVALID_VALUE, errors=[f"Healer output does not match expected schema: {e}", f"Raw output: {healer_output_raw}"])
+            logger.error(
+                "Healer output does not match schema (%d validation errors). Raw output: %s",
+                e.error_count(), healer_output_raw,
+            )
+            raise PreProcessingError(
+                code=ValidationErrorCode.INVALID_VALUE,
+                errors=[f"Healer output does not match expected schema: {e}", f"Raw output: {healer_output_raw}"],
+            )
 
+        logger.info("Dialogue healed successfully")
         return composed_dialogue
