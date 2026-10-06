@@ -44,6 +44,27 @@ class Healer:
 
 
     def heal_dialogue(self, composed_dialogue: ComposedDialogue, game_context: GameContext, npc_context: NPCContext, issues: list[JudgeIssue]) -> ComposedDialogue:
+        """Produce a corrected version of a dialogue based on Judger feedback.
+
+        Builds a healer contract from the dialogue, the contexts and the
+        reported issues, sends it to the LLM, and composes the raw output
+        back into a ComposedDialogue.
+
+        Args:
+            composed_dialogue: The dialogue to be corrected.
+            game_context: Contextual information about the game/world state.
+            npc_context: Contextual information about the NPC speaking the dialogue.
+            issues: The issues reported by the Judger that the healer must fix.
+
+        Returns:
+            A new ComposedDialogue with the issues addressed.
+
+        Raises:
+            PreProcessingError: If the healer output does not match the
+                expected schema (ValidationError during composition).
+            Exception: Any exception raised by the LLM client during
+                generation is logged and re-raised unchanged.
+        """
         logger.info(
             "Healing dialogue: %d issue(s) (%s)",
             len(issues), ", ".join(i.category for i in issues),

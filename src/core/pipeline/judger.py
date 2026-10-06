@@ -37,7 +37,31 @@ class Judger:
         self._client = client
 
     def judge_dialogue(self, composed_dialogue, npc_context, game_context) -> list[JudgeIssue]:
+        """Evaluate a dialogue and report the issues found.
 
+        Combines two kinds of checks:
+        - LLM-based: a set of yes/no questions (built from the NPC context
+          and the language/fairness/profanity settings) is sent to the LLM;
+          every question answered False becomes an issue.
+        - Static: deterministic format checks run directly on the dialogue.
+
+        Args:
+            composed_dialogue: The dialogue to be judged.
+            npc_context: Contextual information about the NPC speaking the dialogue.
+            game_context: Contextual information about the game/world state.
+
+        Returns:
+            The list of JudgeIssue found (LLM issues first, then static
+            ones). An empty list means the dialogue passed all checks.
+
+        Raises:
+            PreProcessingError: If the judge output does not match the
+                expected schema (ValidationError during parsing).
+            MiddlewareError: If the judge answers do not match the questions
+                asked (missing or unexpected question ids).
+            Exception: Any exception raised by the LLM client during
+                generation is logged and re-raised unchanged.
+        """
         judge_questions = build_judge_questions(
             npc_context = npc_context,
             language = Settings().language,
