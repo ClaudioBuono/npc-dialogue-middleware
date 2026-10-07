@@ -76,7 +76,7 @@ def test_build_invalid_intent(builder, game_context):
     with pytest.raises(ValidationError, match="Input should be a valid dictionary or object"):
         npc_context = NPCContext(
                 name="Gorg",
-                age=15, # TODO: Maybe enable "Unknown" age
+                age=15,
                 personality="Angry",
                 context="Cave",
                 talkativeness=Talkativeness.LOW,

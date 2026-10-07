@@ -12,20 +12,6 @@ class Contract:
     output_schema: dict[str, Any] = field(default_factory=dict)
 
 @dataclass(frozen=True)
-class JudgeQuestion:
-    """
-    A question for the judge to evaluate.
-    """
-    id: str
-    text: str
-
-@dataclass(frozen=True)
-class JudgeIssue:
-    """An issue in the dialogue found by the Judge"""
-    category: str
-    issue: str
-
-@dataclass(frozen=True)
 class DialogueStream:
     """A started dialogue stream together with its response headers.
 
@@ -41,7 +27,22 @@ class DialogueStream:
     chunks: Iterator[str]
 
 
-# TODO: move to a better place
+# --- JUDGER DATACLASSES ---
+
+@dataclass(frozen=True)
+class JudgeQuestion:
+    """
+    A question for the judge to evaluate.
+    """
+    id: str
+    text: str
+
+@dataclass(frozen=True)
+class JudgeIssue:
+    """An issue in the dialogue found by the Judge"""
+    category: str
+    issue: str
+
 class JudgeProblem(BaseModel):
     """A problem found by the Judger."""
     id: str

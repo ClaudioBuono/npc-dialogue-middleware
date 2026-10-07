@@ -1,11 +1,11 @@
-# Semantic constraints for Game Context (TODO: Move inside CONFIG).
+# Semantic constraints for Game Context.
 MIN_EPOCH_LENGTH = 2
 MAX_EPOCH_LENGTH = 1000
 MAX_ENVIRONMENT_LENGTH = 2000
 MAX_WORLD_STATE_LENGTH = 3000
 MAX_MAIN_CHARACTER_DESCRIPTION_LENGTH = 2000
 
-# Semantic constraints for NPC Context — (TODO: Move inside CONFIG).
+# Semantic constraints for NPC Context.
 MIN_NAME_LENGTH = 2
 MAX_NAME_LENGTH = 100
 MIN_AGE = 0

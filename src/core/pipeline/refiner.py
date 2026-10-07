@@ -31,7 +31,7 @@ class Refiner:
         """
         self.healer = healer
         self.judger = judger
-        self.max_iterations = Settings().refiner_max_iterations # TODO: Change name to match current semantic meaning?
+        self.max_iterations = Settings().refiner_max_iterations
 
     def set_client(self, client: OpenAICompatibleClient):
         """Propagate the LLM client to the underlying healer and judger.

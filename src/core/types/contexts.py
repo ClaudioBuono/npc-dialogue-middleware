@@ -99,7 +99,7 @@ class NPCContext(BaseModel):
         description="The current driving purpose of the conversation."
     )
     name: str = Field(..., description="The full name, title, or alias of the NPC suitable for the game setting.", examples=["Garrick the Blacksmith"])
-    age: int = Field(..., description="The age of the character.", examples=[45]) #TODO: change from int to str
+    age: int = Field(..., description="The age of the character.", examples=[45])
     personality: str = Field(..., description="Psychological profile and behavioral traits of the NPC.", examples=["Gruff but kind-hearted, easily annoyed by time-wasters."])
     context: str = Field(..., description="The immediate state of the NPC: their current location, time of day, weather, and current activity.", examples=["Working at the forge, late evening, raining outside."])
     talkativeness: Talkativeness = Field(..., description="How much the NPC tends to talk.", examples=["Balanced"]) 

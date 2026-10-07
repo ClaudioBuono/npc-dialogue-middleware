@@ -14,7 +14,6 @@ class DialogueGenerator:
     def __init__(self) -> None:
         self._client = None
 
-    #TODO: Manage exceptions
     def generate(self, contract: Contract) -> str:
         return self._client.generate(contract, temperature=Settings().llm.dialogue_generator_temperature)
     

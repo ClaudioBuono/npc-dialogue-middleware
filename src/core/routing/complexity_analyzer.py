@@ -87,8 +87,7 @@ class ComplexityAnalyzer:
     _WEIGHTS = {
         "context_length": 0.25,
         "intent_richness": 0.25,
-        "intent_weight": 0.45,
-        "manual_flag": 0.05,
+        "intent_weight": 0.50,
     }
 
     # Known intents, with an intrinsic complexity weight (0.0 - 1.0, must sum to 1.0)
@@ -104,7 +103,7 @@ class ComplexityAnalyzer:
         min_tokens: float = 150,
         max_tokens: float | dict[str, float] = 800,
         chars_per_token: float = 4.0,
-        flag_field_weight: float = 2.0, #TODO: should be adapted to the request options number
+        flag_field_weight: float = 2.0,
     ):
         """
         Args:
@@ -203,18 +202,17 @@ class ComplexityAnalyzer:
         """
         Calculates the overall complexity score and assigns a routing tier.
 
-        Computes a weighted average of four features:
-        - text_content_length: Total rough token estimate of all text fields.
+        Computes a weighted average of three features:
+        - context_length: Total rough token estimate of all text fields.
         - intent_richness: The density and structure of populated optional intent fields.
-        - intrinsic_intent_complexity: Base baseline difficulty of the intent type (e.g., Quest vs Dialogue, Quest must have higher complexity).
-        - manual_narrative_importance_flag: Override based on critical NPC relationships.
+        - intent_weight: Base difficulty of the intent type (e.g., Quest vs Dialogue,
+        Quest must have higher complexity).
         """
 
         breakdown = {
             "context_length": self._score_context_length(game_context, npc_context),
             "intent_richness": self._score_intent_richness(npc_context.intent),
             "intent_weight": self._score_intent(npc_context.intent),
-            "manual_flag": self._score_manual_flag(npc_context),
         }
 
 
@@ -336,17 +334,6 @@ class ComplexityAnalyzer:
         intent_name = type(intent).__name__.lower()
         return self._INTENT_COMPLEXITY.get(intent_name, self._DEFAULT_INTENT_COMPLEXITY)
 
-    # ------------------------------------------------------------------
-    # Manual override flag
-    # ------------------------------------------------------------------
-
-    def _score_manual_flag(self, npc_context: NPCContext) -> float:
-        """
-        Allows explicit override for narratively important NPCs/relations,
-        e.g. a hostile or romantic relation might warrant a more capable model.
-        """
-        important_relations = {"hostile", "romantic interest", "nemesis"} #TODO: obtain this list from input or saved words
-        return 1.0 if npc_context.main_character_relation.lower() in important_relations else 0.0
     
     # ------------------------------------------------------------------
     # DEBUG

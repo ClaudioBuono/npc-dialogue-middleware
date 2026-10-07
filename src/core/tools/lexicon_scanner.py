@@ -49,7 +49,7 @@ class FastLexiconScanner:
         for term in terms:
             self.automaton.add_word(term.lower(), term.lower())
         self.automaton.make_automaton()
-        self.max_len = max((len(t) for t in terms), default=0) # TODO: Remove?????
+        self.max_len = max((len(t) for t in terms), default=0)
 
     def scan(self, text: str) -> list[str]:
         """Scans input text for matches bounded by whole-word boundaries.

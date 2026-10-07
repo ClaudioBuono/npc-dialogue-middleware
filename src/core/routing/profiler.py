@@ -23,12 +23,11 @@ _DEFAULT_FALLBACK_SCORE = _TIER_TO_SCORE[ComplexityTier.MEDIUM]
 _TIMEOUT_PENALTY_SCORE = 5.0  # Minimal score assigned when a model times out during profiling
 
 # Relative importance of each metric in the final score.
-# TODO: tune these weights against real benchmark data once available.
 _WEIGHT_COMPLETION_TIME = 0.45
 _WEIGHT_TTFT = 0.35
 _WEIGHT_THROUGHPUT = 0.20
 
-# Normalization scales — TODO: tune based on real hardware/model data.
+# Normalization scales
 _COMPLETION_TIME_SCALE_SECONDS = 8.0   # ~8s -> score halved
 _TTFT_SCALE_SECONDS = 2.0              # ~2s -> score halved
 _THROUGHPUT_REFERENCE_TOKENS_PER_SEC = 40.0  # throughput at/above this -> full score
