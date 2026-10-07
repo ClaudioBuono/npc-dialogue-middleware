@@ -59,7 +59,14 @@ class ContractBuilder:
         raise ValueError(f"Unsupported intent type: {type(npc_context.intent)}")
 
 
-    def build_judge_contract(self, composed_dialogue: ComposedDialogue, game_context: GameContext, npc_context: NPCContext, questions: List[JudgeQuestion]) -> Contract:
+    def build_judge_contract(
+        self,
+        composed_dialogue: ComposedDialogue,
+        game_context: GameContext,
+        npc_context: NPCContext,
+        questions: List[JudgeQuestion],
+        bad_reasons: str | None = None,
+    ) -> Contract:
         """Build the execution contract for the judge LLM evaluation task.
 
         Formats the dialogue, game, and NPC contexts into system and user prompts,
@@ -70,6 +77,10 @@ class ContractBuilder:
             composed_dialogue (ComposedDialogue): The composed dialogue instance to be evaluated.
             game_context (GameContext): The global game state and environment context.
             npc_context (NPCContext): The NPC profile, personality, and dialogue parameters.
+            questions (List[JudgeQuestion]): The yes/no questions the judge must answer.
+            feedback (str | None): Optional correction message describing problems found
+                in the judge's previous answer (e.g. invalid reasons). When provided, it is
+                appended to the user prompt so the judge can regenerate its answer.
 
         Returns:
             Contract: A Contract instance containing the assembled system prompt, user prompt,
@@ -78,6 +89,10 @@ class ContractBuilder:
         system_prompt = self._build_judge_system_prompt()
         user_prompt = self._build_judge_user_prompt(composed_dialogue, game_context, npc_context, questions)
         output_schema = self._build_judge_output_schema([q.id for q in questions])
+
+        if bad_reasons:
+            judger_prompt = JUDGE_FEEDBACK_PROMPT_TEMPLATE.format(details=bad_reasons)
+            user_prompt = f"{user_prompt}\n\n{judger_prompt}"
 
         return Contract(
             system_prompt=system_prompt,

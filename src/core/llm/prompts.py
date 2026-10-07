@@ -156,6 +156,13 @@ JUDGE_RULES_PROMPT = inspect.cleandoc("""
     - Respond EXCLUSIVELY with a JSON object, with no text before or after, in the format indicated below.
 """)
 
+JUDGE_FEEDBACK_PROMPT_TEMPLATE = inspect.cleandoc("""
+    CORRECTION REQUIRED:
+    Your previous answer had invalid reasons: they must be complete sentences that cite concrete elements of the dialogue, never just TRUE/FALSE or empty.
+    Regenerate the full answer knowing that there are these problems in the reasons:
+    {details}
+""")
+
 # ---- HEALER ----
 
 HEALER_BASE_PROMPT = inspect.cleandoc("""

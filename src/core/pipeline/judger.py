@@ -10,11 +10,13 @@ from core.llm.openai_client import OpenAICompatibleClient
 from core.pipeline.guardrail import Guardrail
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode, PreProcessingError, ValidationErrorCode
 from core.tools.judge_questions import build_judge_questions
-from core.types.contexts import Dialogue, GameContext, NPCContext
+from core.types.contexts import NPCContext
 from core.types.dataclasses import JudgeIssue, JudgeOutput, JudgeProblem, JudgeQuestion
-from core.types.enums import Language
 
 logger = logging.getLogger(__name__)
+
+MIN_REASON_LENGTH = 15
+MAX_JUDGE_ATTEMPTS = 3
 
 class Judger:
     """
@@ -42,7 +44,9 @@ class Judger:
         Combines two kinds of checks:
         - LLM-based: a set of yes/no questions (built from the NPC context
           and the language/fairness/profanity settings) is sent to the LLM;
-          every question answered False becomes an issue.
+          every question answered False becomes an issue. If a False answer
+          has a reason shorter than MIN_REASON_LENGTH, the judge is called
+          again (up to MAX_JUDGE_ATTEMPTS) with feedback on the bad reasons.
         - Static: deterministic format checks run directly on the dialogue.
 
         Args:
@@ -58,13 +62,14 @@ class Judger:
             PreProcessingError: If the judge output does not match the
                 expected schema (ValidationError during parsing).
             MiddlewareError: If the judge answers do not match the questions
-                asked (missing or unexpected question ids).
+                asked (missing or unexpected question ids), or if the reasons
+                are still invalid after MAX_JUDGE_ATTEMPTS attempts.
             Exception: Any exception raised by the LLM client during
                 generation is logged and re-raised unchanged.
         """
         judge_questions = build_judge_questions(
-            npc_context = npc_context,
-            language = Settings().language,
+            npc_context=npc_context,
+            language=Settings().language,
             fairness=Settings().fairness_filter,
             profanity=Settings().profanity_filter,
         )
@@ -73,34 +78,60 @@ class Judger:
             len(judge_questions), ", ".join(q.id for q in judge_questions), Settings().language.name,
         )
 
-        judge_contract = self.contract_builder.build_judge_contract(composed_dialogue, game_context, npc_context, judge_questions)
+        judge_output: JudgeOutput | None = None
+        feedback: str | None = None
 
-        try:
-            judge_output_raw = self._client.generate(judge_contract, Settings().llm.judger_temperature) # TODO: Test higher temperatures
-        except Exception:
-            logger.exception("Judge LLM call failed")
-            raise
-
-        try:
-            judge_output = JudgeOutput.model_validate_json(judge_output_raw)
-        except ValidationError as e:
-            logger.error(
-                "Judge output does not match schema (%d validation errors). Raw output: %s",
-                e.error_count(), judge_output_raw,
-            )
-            raise PreProcessingError(
-                code=ValidationErrorCode.INVALID_VALUE,
-                errors=[f"Judge output does not match expected schema: {e}", f"Raw output: {judge_output_raw}"],
+        for attempt in range(1, MAX_JUDGE_ATTEMPTS + 1):
+            judge_contract = self.contract_builder.build_judge_contract(
+                composed_dialogue, game_context, npc_context, judge_questions, feedback,
             )
 
-        if not self._check_valid_response(judge_output, judge_questions):
-            expected = {q.id for q in judge_questions}
-            received = {a.id for a in judge_output.answers}
-            logger.error(
-                "Judge response mismatch: missing=%s, unexpected=%s, expected_count=%d, received_count=%d",
-                sorted(expected - received), sorted(received - expected),
-                len(judge_questions), len(judge_output.answers),
-            )
+            try:
+                judge_output_raw = self._client.generate(judge_contract, Settings().llm.judger_temperature)  # TODO: Test higher temperatures
+            except Exception:
+                logger.exception("Judge LLM call failed")
+                raise
+
+            try:
+                candidate = JudgeOutput.model_validate_json(judge_output_raw)
+            except ValidationError as e:
+                logger.error(
+                    "Judge output does not match schema (%d validation errors). Raw output: %s",
+                    e.error_count(), judge_output_raw,
+                )
+                raise PreProcessingError(
+                    code=ValidationErrorCode.INVALID_VALUE,
+                    errors=[f"Judge output does not match expected schema: {e}", f"Raw output: {judge_output_raw}"],
+                )
+
+            if not self._check_valid_response(candidate, judge_questions):
+                expected = {q.id for q in judge_questions}
+                received = {a.id for a in candidate.answers}
+                logger.error(
+                    "Judge response mismatch: missing=%s, unexpected=%s, expected_count=%d, received_count=%d",
+                    sorted(expected - received), sorted(received - expected),
+                    len(judge_questions), len(candidate.answers),
+                )
+                raise MiddlewareError(
+                    code=MiddlewareErrorCode.INVALID_RESPONSE,
+                    errors=["There was a problem during the judging process."],
+                )
+
+            bad_reasons = self._check_reasons(candidate)
+            if bad_reasons:
+                logger.warning(
+                    "Judge attempt %d/%d: %d invalid reason(s): %s",
+                    attempt, MAX_JUDGE_ATTEMPTS, len(bad_reasons),
+                    ", ".join(f"{a.id}={a.reason!r}" for a in bad_reasons),
+                )
+                feedback = self._build_reason_feedback(bad_reasons)
+                continue
+
+            judge_output = candidate
+            break
+
+        if judge_output is None:
+            logger.error("Judge produced invalid reasons for %d consecutive attempts", MAX_JUDGE_ATTEMPTS)
             raise MiddlewareError(
                 code=MiddlewareErrorCode.INVALID_RESPONSE,
                 errors=["There was a problem during the judging process."],
@@ -253,3 +284,22 @@ class Judger:
             return JudgeIssue(category="Banned words", issue=f"Banned words used in the dialogue: {joined}")
         logger.debug("Banned words check: clean")
         return None
+
+    def _check_reasons(self, judge_output: JudgeOutput) -> list[JudgeProblem]:
+        """Return the False answers whose reason is shorter than MIN_REASON_LENGTH.
+
+        Only False answers are checked, since they are the ones that become
+        JudgeIssue.
+
+        Returns:
+            The offending answers (empty list if all reasons are valid).
+        """
+        return [
+            a for a in judge_output.answers
+            if len(a.reason.strip()) < MIN_REASON_LENGTH
+        ]
+
+    def _build_reason_feedback(self, bad_reasons: list[JudgeProblem]) -> str:
+        """Build the feedback message to send to the judge on retry."""
+        details = "\n".join(f'- id="{a.id}": reason={a.reason!r}' for a in bad_reasons)
+        return details
