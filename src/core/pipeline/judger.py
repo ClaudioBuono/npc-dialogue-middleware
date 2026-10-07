@@ -251,4 +251,5 @@ class Judger:
             joined = ", ".join(banned_words)
             logger.debug("Banned words found: %s", joined)
             return JudgeIssue(category="Banned words", issue=f"Banned words used in the dialogue: {joined}")
+        logger.debug("Banned words check: clean")
         return None

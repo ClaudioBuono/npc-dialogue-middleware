@@ -7,7 +7,6 @@ import logging
 import threading
 from dataclasses import dataclass, asdict, field
 from typing import Literal
-from core.helpers.formatters import to_json_format
 
 telemetry_logger = logging.getLogger("telemetry")  # raw log, one line per request
 
@@ -124,7 +123,7 @@ class TelemetryStore:
         self._save_to_file()  # write the file immediately with the empty entries
 
     def record(self, sample: RequestTelemetry):
-        telemetry_logger.info(f"Updated telemetry info for {sample.model_identifier}:\n {to_json_format(sample)}")
+        telemetry_logger.info("Request telemetry: %s", json.dumps(asdict(sample), ensure_ascii=False))
 
         with self._lock:
             stats = self._stats.setdefault(

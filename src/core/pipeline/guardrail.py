@@ -1,6 +1,7 @@
 import logging
 import re
 from threading import Lock
+import time
 from core.configuration.settings import Settings
 from core.types.contexts import GameContext, NPCContext
 from core.types.enums import Language
@@ -29,6 +30,7 @@ class Guardrail:
             sender: The object that emitted the language_changed signal.
             language: The new active language.
         """
+        logger.info("Language changed to %s", language.name)
         self._build_lexicon(language)
 
     def _build_lexicon(self, language: Language) -> None:
@@ -38,10 +40,11 @@ class Guardrail:
         Args:
             language: The language to build the lexicon for.
         """
+        start = time.perf_counter()
         terms = self._load_derogatory_terms(language)
         with self._scanner_lock:
             self.lexicon_scanner = FastLexiconScanner(terms)
-        logger.info(f"Lexicon rebuilt for language {language}")
+        logger.debug("Lexicon built: language=%s, %d terms, %.2fs", language.name, len(terms), time.perf_counter() - start)
 
     def _retrieve_banned_words(self, text: str) -> list[str]:
         """Return the banned terms found in a string."""
@@ -52,20 +55,22 @@ class Guardrail:
         """Return the banned terms found in a ComposedDialogue."""
         return self._retrieve_banned_words(self._composed_output_to_text(composed_output))
 
-    def _validate_text(self, text_to_validate: str) -> bool:
+    def _validate_text(self, text_to_validate: str, source: str) -> bool:
         """Scan a piece of text against the current lexicon for banned words.
 
         Args:
             text_to_validate: The raw text to scan.
+            source: Who is asking to validate the text.
 
         Returns:
             bool: True if no banned terms were found, False otherwise.
         """
-        # Scan for banned words
-        scan_result = self._retrieve_banned_words(text_to_validate)
-        logger.info(f"Fairness scan '{scan_result}'")
-
-        return len(scan_result) == 0
+        banned = self._retrieve_banned_words(text_to_validate)
+        if banned:
+            logger.warning("Lexicon scan of %s: %d banned term(s) found: %s", source, len(banned), banned)
+            return False
+        logger.debug("Lexicon scan of %s: clean", source)
+        return True
 
     def validate_npc_context(self, npc_context: NPCContext) -> bool:
         """Scan the fields of an NPCContext instance for lexicon violations.
@@ -79,7 +84,7 @@ class Guardrail:
         data = npc_context.model_dump(exclude_none=True)
         text = " ".join(f"{key}: {value}" for key, value in data.items())
 
-        return self._validate_text(text)
+        return self._validate_text(text, f"NPC context")
 
     def validate_game_context(self, game_context: GameContext) -> bool:
         """Scan the fields of a GameContext instance for lexicon violations.
@@ -93,7 +98,7 @@ class Guardrail:
         data = game_context.model_dump(exclude_none=True)
         text = " ".join(f"{key}: {value}" for key, value in data.items())
 
-        return self._validate_text(text)
+        return self._validate_text(text, "game context")
 
     def validate_composed_output(self, composed_output: ComposedDialogue) -> bool:
         """Scan the fields of a ComposedDialogue instance for lexicon violations.
@@ -117,7 +122,7 @@ class Guardrail:
         Returns:
             bool: True if the word contains no banned terms, False otherwise.
         """
-        return self._validate_text(censor_word)
+        return self._validate_text(censor_word, "censor word")
 
     def get_streaming_scanner(self) -> StreamingLexiconScanner:
         """Returns a new StreamingLexiconScanner bound to the current lexicon."""
@@ -186,6 +191,8 @@ class Guardrail:
         """Censor the composed dialogue by redacting any terms that are flagged as derogatory."""
 
         banned_words: list[str] = self.retrieve_banned_words_in_composed_dialogue(composed_dialogue)
+        if banned_words:
+            logger.info("Censoring dialogue -- %d banned term(s): %s", len(banned_words), banned_words)
 
         options = composed_dialogue.player_options
 

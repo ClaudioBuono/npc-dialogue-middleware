@@ -2,6 +2,7 @@ import logging
 import os
 import tempfile
 import yaml
+from enum import Enum
 from pathlib import Path
 from threading import RLock
 from blinker import Signal
@@ -10,6 +11,15 @@ from core.helpers.paths import resolve_config_file
 from core.types.enums import Language
 
 logger = logging.getLogger(__name__)
+
+
+def _format_setting_value(value) -> str:
+    """Compact, readable representation of a setting value for log messages."""
+    if isinstance(value, Enum):
+        return value.name
+    if isinstance(value, BaseModel):
+        return ", ".join(f"{k}={v}" for k, v in value.model_dump().items())
+    return repr(value) if isinstance(value, str) else str(value)
 
 
 class LLMSettings(BaseModel):
@@ -77,7 +87,7 @@ class Settings:
         with open(path, "r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
         settings = AppSettings(**raw)
-        logger.debug("Settings loaded from %s: %s", path, settings)
+        logger.debug("Settings loaded from %s:\n%s", path, settings.model_dump_json(indent=2))
         type(self)._settings = settings
 
     def __getattr__(self, item):
@@ -97,6 +107,7 @@ class Settings:
     def reload(cls) -> "Settings":
         if cls._config_dir is None:
             raise RuntimeError("Settings.configure(config_dir) was never called")
+        logger.info("Reloading settings from disk")
         with cls._lock:
             cls._settings = None
             cls._instance = None
@@ -129,18 +140,7 @@ class Settings:
             except Exception:
                 Path(tmp_name).unlink(missing_ok=True)
                 raise
-
-    @classmethod
-    def _persist(cls) -> None:
-        """Save to disk without letting an I/O error crash the caller.
-
-        The in-memory change is already applied; if writing fails we log
-        the error so the app keeps working with the new value.
-        """
-        try:
-            cls.save()
-        except Exception:
-            logger.exception("Failed to persist settings to disk")
+            logger.debug("Settings saved to %s", path)
 
     @classmethod
     def _ensure_loaded(cls) -> None:
@@ -148,68 +148,70 @@ class Settings:
             cls()  # force loading
 
     @classmethod
-    def change_language(cls, language: Language) -> None:
-        """Update the active language and persist it."""
+    def _update(cls, name: str, value) -> bool:
+        """Set a top-level setting, persist it and log old -> new.
+
+        The in-memory change is applied first; if writing to disk fails the
+        error is logged and the app keeps working with the new value.
+
+        Args:
+            name: Name of the AppSettings field to update.
+            value: The new value.
+
+        Returns:
+            True if the value changed, False if it was already set.
+        """
         with cls._lock:
             cls._ensure_loaded()
-            cls._settings.language = language
-            cls._persist()
-        logger.info(f"Language changed to {language.index}")
-        cls.language_changed.send(cls, language=language)
+            old = getattr(cls._settings, name)
+            setattr(cls._settings, name, value)
+            try:
+                cls.save()
+            except Exception:
+                logger.exception("Failed to persist settings to disk: the change is applied in memory only")
+
+        if old == value:
+            logger.info("Setting '%s' unchanged: %s", name, _format_setting_value(value))
+            return False
+
+        logger.info("Setting '%s' changed: %s -> %s", name, _format_setting_value(old), _format_setting_value(value))
+        return True
+
+    @classmethod
+    def change_language(cls, language: Language) -> None:
+        """Update the active language and persist it. Notifies listeners only if it changed."""
+        if cls._update("language", language):
+            cls.language_changed.send(cls, language=language)
 
     @classmethod
     def toggle_fairness_filter(cls, flag: bool) -> None:
         """Enable or disable the prompt fairness filter and persist it."""
-        with cls._lock:
-            cls._ensure_loaded()
-            cls._settings.fairness_filter = flag
-            cls._persist()
-        logger.info(f"Prompt fairness filter {'ON' if flag else 'OFF'}")
+        cls._update("fairness_filter", flag)
 
     @classmethod
     def set_number_of_options(cls, value: int) -> None:
         """Set the number of dialogue options per turn and persist it."""
-        with cls._lock:
-            cls._ensure_loaded()
-            cls._settings.number_of_options = value
-            cls._persist()
-        logger.info(f"Number of options set to {value}")
+        cls._update("number_of_options", value)
 
     @classmethod
     def update_llm_settings(cls, llm_settings: LLMSettings) -> None:
         """Replace the LLM settings (temperature) and persist them."""
-        with cls._lock:
-            cls._ensure_loaded()
-            cls._settings.llm = llm_settings
-            cls._persist()
-        logger.info(f"LLM settings updated: {llm_settings}")
+        cls._update("llm", llm_settings)
 
     @classmethod
     def update_profanity_filter_settings(cls, profanity_filter: bool) -> None:
         """Replace the profanity filter and persist it."""
-        with cls._lock:
-            cls._ensure_loaded()
-            cls._settings.profanity_filter = profanity_filter
-            cls._persist()
-        logger.info(f"Profanity filter setting updated: {profanity_filter}")
+        cls._update("profanity_filter", profanity_filter)
 
     @classmethod
     def update_censor_word(cls, censor_word: str) -> None:
         """Update the censor word and persist it."""
-        with cls._lock:
-            cls._ensure_loaded()
-            cls._settings.censor_word = censor_word
-            cls._persist()
-        logger.info(f"Censor word updated: {censor_word}")
+        cls._update("censor_word", censor_word)
 
     @classmethod
     def update_refiner_max_iterations(cls, max_iterations: int) -> None:
         """Update the refiner max iterations and persist it."""
-        with cls._lock:
-            cls._ensure_loaded()
-            cls._settings.refiner_max_iterations = max_iterations
-            cls._persist()
-        logger.info(f"Refiner max iterations updated: {max_iterations}")
+        cls._update("refiner_max_iterations", max_iterations)
 
     @classmethod
     def get_current(cls) -> AppSettings:

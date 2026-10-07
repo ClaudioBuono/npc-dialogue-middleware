@@ -45,11 +45,9 @@ class OpenAICompatibleClient(BaseLLMClient):
                 timeout) or if the model returns an empty/non-text response.
         """
         request = self._format_request(contract, temperature)
-        logger.debug(f"Raw request: \n {request}")
         request["stream"] = True
         request["stream_options"] = {"include_usage": True}
-        if logger.isEnabledFor(logging.DEBUG):
-            self._log_human_readable_request(request)
+        self._log_human_readable_request(request)
 
         recorder = TelemetryRecorder(self._model_identifier)
         chunks: list[str] = []
@@ -102,12 +100,14 @@ class OpenAICompatibleClient(BaseLLMClient):
         content = "".join(chunks)
 
         if not content:
+            logger.error("Model '%s' returned an empty response", self._model_identifier)
             raise LLMClientError(
                 code=LLMClientErrorCode.EMPTY_RESPONSE,
                 message=f"Model '{self._model_identifier}' returned an empty response "
                         f"(possibly a tool call or content filter block).",
             )
 
+        self._log_response(content)
         return content
 
     def generate_streaming(self, contract: Contract, temperature: float) -> Iterator[str]:
@@ -116,11 +116,9 @@ class OpenAICompatibleClient(BaseLLMClient):
             to first token, throughput). See BaseLLMClient for full contract.
             """
             request = self._format_request(contract, temperature)
-            logger.debug(f"Raw request: \n {request}")
             request["stream"] = True
             request["stream_options"] = {"include_usage": True}
-            if logger.isEnabledFor(logging.DEBUG):
-                self._log_human_readable_request(request)
+            self._log_human_readable_request(request)
 
             recorder = TelemetryRecorder(self._model_identifier)
             recorder.__enter__()  # sets self._start; must be called explicitly since `with` can't be used in a generator
@@ -139,15 +137,7 @@ class OpenAICompatibleClient(BaseLLMClient):
                         yield delta
 
                 content = "".join(chunks)
-
-                # Try formatting a json response, fallback to a regular string if it fails
-                try:
-                    formatted_content = json.dumps(json.loads(content), indent=2, ensure_ascii=False)
-                except Exception:
-                    formatted_content = content
-
-                logger.info(f"Generated response: \n {formatted_content}")
-                # logger.info(f"Generated response: \n {to_json_format(content)}")
+                self._log_response(content)
 
             except AuthenticationError as e:
                 raise LLMClientError(code=LLMClientErrorCode.AUTHENTICATION_ERROR, message=f"Authentication failed for model '{self._model_identifier}': {e}") from e
@@ -261,8 +251,10 @@ class OpenAICompatibleClient(BaseLLMClient):
             if the endpoint is unreachable (e.g. the backend isn't Ollama), the
             request fails, or this model isn't currently loaded.
         """
+        url = self._client.base_url.copy_with(path="/api/ps")
         try:
-            resp = httpx.get(f"{self._client.base_url}/api/ps", timeout=1.0)
+            resp = httpx.get(url, timeout=1.0)
+            resp.raise_for_status()
             models = resp.json().get("models", [])
             match = next((m for m in models if m["name"] == self._model_identifier), None)
             if match:
@@ -270,13 +262,18 @@ class OpenAICompatibleClient(BaseLLMClient):
                     used_mb=round(match["size_vram"] / (1024**2), 2),
                     source="ollama_ps",
                 )
-        except Exception:
-            pass
+            logger.debug("Ollama /api/ps: model '%s' is not loaded", self._model_identifier)
+        except Exception as e:
+            logger.debug("Ollama /api/ps probe failed (%s): %s", url, e)
         return VramReading.unavailable()
 
     def _log_human_readable_request(self, request: dict):
         """Logs the LLM request in a human-readable format."""
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+        
         lines = [
+            "\n"
             "=================== LLM REQUEST ===================",
             f"Model: {request.get('model')} | Temp: {request.get('temperature')}",
         ]
@@ -298,3 +295,14 @@ class OpenAICompatibleClient(BaseLLMClient):
 
         logger.debug("\n".join(lines))
 
+    def _log_response(self, content: str) -> None:
+        """Logs the raw model response, pretty-printed if it is JSON."""
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+        
+        try:
+            content = json.dumps(json.loads(content), indent=2, ensure_ascii=False)
+        except ValueError:
+            pass
+
+        logger.debug("LLM response (%s):\n%s", self._model_identifier, content)

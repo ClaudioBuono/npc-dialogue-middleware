@@ -1,3 +1,4 @@
+import time
 from typing import Any, Optional, Iterator
 import logging
 from api.schemas import ComposedDialogue
@@ -81,18 +82,17 @@ class Orchestrator:
 
         StateManager().transition_to(MiddlewareState.SETTING_CONTEXT)
 
-        self.game_context = game_context
+        logger.info("Game context set")
 
         StateManager().transition_to(MiddlewareState.IDLE)
-        
+
+        self.game_context = game_context
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Game context: %s", to_json_format(game_context))
+
 
     def generate_dialogue(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> ComposedDialogue | None:
         """Generate NPC dialogue using the NPC and game context.
-
-        Pipeline: build the prompt contract, generate the raw dialogue with the
-        selected LLM, compose it into a structured ComposedDialogue, then apply
-        either the refiner or the profanity censor, and finally store the result
-        in the dialogue history.
 
         Args:
             npc_context: Information about the NPC that is speaking.
@@ -102,15 +102,66 @@ class Orchestrator:
         Returns:
             The final structured dialogue (text, intent and player options).
         """
-
-        logger.info(f"Generating dialogue for NPC '{npc_context.name}'")
         StateManager().transition_to(MiddlewareState.GENERATING)
+        start = time.perf_counter()
+        logger.info(
+            "Generating dialogue: npc=%r, intent=%s, history_turns=%d, player_choice=%s",
+            npc_context.name, type(npc_context.intent).__name__,
+            len(self.dialogue_history.get_dialogue_history()), bool(last_player_choice),
+        )
 
+        try:
+            composed_dialogue = self._generate_dialogue(npc_context, last_player_choice)
+        except Exception as e:
+            logger.error(
+                "Dialogue generation failed after %.2fs (%s): %s",
+                time.perf_counter() - start, type(e).__name__, e,
+            )
+            raise
+        finally:
+            StateManager().transition_to(MiddlewareState.IDLE)
+
+        logger.info("Dialogue generated for NPC %r in %.2fs", npc_context.name, time.perf_counter() - start)
+        return composed_dialogue
+
+    
+    def generate_dialogue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
+        """Generate NPC dialogue using the NPC and game context via streaming."""
+
+        StateManager().transition_to(MiddlewareState.GENERATING)
+        start = time.perf_counter()
+        logger.info(
+            "Generating dialogue stream: npc=%r, intent=%s, history_turns=%d, player_choice=%s",
+            npc_context.name, type(npc_context.intent).__name__,
+            len(self.dialogue_history.get_dialogue_history()), bool(last_player_choice),
+        )
+
+        try:
+            raw_stream = self._start_dialogue_stream(npc_context, last_player_choice)
+
+            released: list[str] = []
+            for text in self._guarded_stream(raw_stream):
+                released.append(text)
+                yield text
+
+            self._save_streamed_dialogue(npc_context, "".join(released))
+        finally:
+            StateManager().transition_to(MiddlewareState.IDLE)
+
+        logger.info("Dialogue stream completed for NPC %r in %.2fs", npc_context.name, time.perf_counter() - start)
+
+    # Pipeline Methods ----------------------------------------------------------------------------
+    def _generate_dialogue(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> ComposedDialogue | None:
+        """
+        Pipeline: build the prompt contract, generate the raw dialogue with the
+        selected LLM, compose it into a structured ComposedDialogue, then apply
+        either the refiner or the profanity censor, and finally store the result
+        in the dialogue history.
+        """
         # Record the player's reply first, so the contract includes it as context.
         if last_player_choice:
             self.dialogue_history.add_player_dialogue_to_history(last_player_choice)
-            logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
-
+            
         # Build the prompt contract from game state, NPC info and conversation so far.
         contract = self.contract_builder.build_dialogue_contract(
             self.game_context, npc_context, self.dialogue_history.get_dialogue_history()
@@ -120,7 +171,7 @@ class Orchestrator:
         client: OpenAICompatibleClient = self.llm_router.select_model(
             game_context=self.game_context, npc_context=npc_context
         )
-        logger.debug(f"Selected LLM client: {type(client).__name__}")
+        logger.info("Selected LLM: %s", client.model_name)
 
         # Generate the raw LLM output, then parse it into a structured dialogue.
         self.dialogue_generator.set_client(client)
@@ -140,31 +191,9 @@ class Orchestrator:
 
         # Store the final (post-processed) dialogue so later turns see what the player saw.
         self.dialogue_history.add_npc_dialogue_to_history(composed_dialogue)
-
-        StateManager().transition_to(MiddlewareState.IDLE)
-
-        logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
+        self._log_history()
 
         return composed_dialogue
-
-    
-    def generate_dialogue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
-        """Generate NPC dialogue using the NPC and game context via streaming."""
-
-        StateManager().transition_to(MiddlewareState.GENERATING)
-        logger.info(f"Generating dialogue stream for NPC '{npc_context.name}'")
-
-        try:
-            raw_stream = self._start_dialogue_stream(npc_context, last_player_choice)
-
-            released: list[str] = []
-            for text in self._guarded_stream(raw_stream):
-                released.append(text)
-                yield text
-
-            self._save_streamed_dialogue(npc_context, "".join(released))
-        finally:
-            StateManager().transition_to(MiddlewareState.IDLE)
 
     def _start_dialogue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
         """Update history, build the contract, select the client and start the raw stream."""
@@ -225,3 +254,11 @@ class Orchestrator:
             logger.debug(f"Dialogue history updated:\n{to_json_format(self.dialogue_history.get_dialogue_history())}")
         except Exception:
             logger.exception("Failed to compose dialogue after stream")
+
+    def _log_history(self) -> None:
+        """Logs the current dialogue history at DEBUG level."""
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "Dialogue history updated:\n%s",
+                to_json_format(self.dialogue_history.get_dialogue_history()),
+            )

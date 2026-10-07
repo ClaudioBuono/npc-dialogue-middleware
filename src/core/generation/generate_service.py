@@ -63,9 +63,9 @@ class GenerateService:
 
     # -- Public use cases ------------------------------------------------------
     def set_game_context(self, game_context: GameContext) -> None:
-        """
-        Normalize and validate the game context, then sets it in the orchestrator. 
-        """
+        """Scan, normalize and validate the game context, then set it in the orchestrator."""
+        if not self._guardrail.validate_game_context(game_context):
+            raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["The middleware refused the game context."])
         pre_processing.normalize_and_validate_game_context(game_context)
         self._orchestrator.set_game_context(game_context)
 

@@ -31,6 +31,7 @@ def _setup_telemetry_store():
     telemetry_path = get_base_path() / "logs" / "telemetry_snapshot.json"
     TelemetryStore.instance().configure_persistence(telemetry_path)
     TelemetryStore.instance().initialize_models(model_ids)
+    logger.info("Telemetry store ready: models=%s, snapshot=%s", model_ids, telemetry_path)
 
 
 @asynccontextmanager
@@ -40,10 +41,12 @@ async def lifespan(app: FastAPI):
     # -- Startup: composition root -----------------------------------------
     orchestrator = build_orchestrator()
     generate_service = build_generate_service(orchestrator)
-
     app.state.dialogue_service = generate_service
+    logger.info("Middleware ready")
 
     yield
+
+    logger.info("Middleware shutting down")
 
 def create_app() -> FastAPI:
     """Build and configure the FastAPI application instance."""
@@ -133,16 +136,12 @@ def main():
     StateManager(initial_state = MiddlewareState.STARTING)
 
     setup_logging(logging.DEBUG)
-    logger = logging.getLogger(__name__)
 
     config_dir = Path(args.config_dir) if args.config_dir else get_base_path() / "config"
     Settings.configure(config_dir)
     Settings()  # force loading now, to fail fast on invalid/missing config
-    logger.info("Starting middleware")
+    logger.info("Starting middleware: config_dir=%s, port=%d, debug=%s", config_dir, args.port, args.debug)  # al posto di "Starting middleware"
 
-    # # Instantiate Orchestrator singleton
-    # Orchestrator()
-    
     ModelRegistry().set_models(profiler = Settings().profiling)
 
     _setup_telemetry_store()
@@ -156,10 +155,10 @@ def main():
 
     if args.port_file:
         Path(args.port_file).write_text(f'{{"port": {port}}}')
-
-
+        logger.info("Port written to %s", args.port_file)
  
     StateManager().transition_to(MiddlewareState.IDLE)
+    logger.info("Starting server on http://127.0.0.1:%d", port) 
 
     uvicorn.run(
         app,
