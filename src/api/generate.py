@@ -2,11 +2,10 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from api.dependencies import get_generate_service
 from api.handlers import MIDDLEWARE_ERROR_STATUS_MAP
-from core.configuration.settings import Settings
 from core.generation.generate_service import GenerateService
 from core.infrastructure.state_manager import StateManager
-from core.types.contexts import GameContext, NPCContext
-from api.schemas import ComposedDialogue, DialogueStreamRequest, MiddlewareStatusResponse
+from core.types.contexts import GameContext
+from api.schemas import ComposedDialogue, GenerateDialogueRequest, MiddlewareStatusResponse
 from api.errors import ALL_ERROR_RESPONSES, MIDDLEWARE_ERROR_RESPONSES, PREPROCESSING_ERROR_RESPONSES, ROUTING_CONFIG_ERROR_RESPONSES, error_responses
 from core.types.dataclasses import DialogueStream
 from core.types.enums import MiddlewareState
@@ -77,49 +76,42 @@ def set_game_context(game_context: GameContext, service: GenerateService = Depen
     return {"status": "ok"}
 
 @router.post(
-	"/generate-dialogue",
-	response_model=ComposedDialogue,
-	summary="Generate NPC Dialogue",
-	description="Generates dialogue and available player responses based on the provided NPC context and current intent.",
-	responses={**ALL_ERROR_RESPONSES, 200: {"description": "Dialogue generated successfully."}}
-)
-def generate_dialogue(npc_context: NPCContext, service: GenerateService = Depends(get_generate_service)):
-
-    
-    dialogue: ComposedDialogue = service.generate(npc_context)
-
-    if dialogue is None:
-        raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["Dialogue generation was refused."])
-
-    return dialogue
-
-@router.post(
-    "/start-dialogue-stream",
-    response_class=StreamingResponse,
-    summary="Starts NPC Dialogue using streaming mode",
-    description="Streams the generated dialogue line by line to reduce perceived latency for the player, cleaning the dialogue history.",
-    responses={
-            **ALL_ERROR_RESPONSES,
-            200: {"description": "Stream of dialogue text."},
-        },
-)
-def start_dialogue_stream(npc_context: NPCContext, service: GenerateService = Depends(get_generate_service)):
-
-    result: DialogueStream  = service.start_stream(npc_context)
-    return StreamingResponse(result.chunks, media_type="text/plain")
-
-
-@router.post(
-    "/continue-dialogue-stream",
-    response_class=StreamingResponse,
-    summary="Continues the NPC Dialogue using streaming mode",
-    description="Streams the generated dialogue line by line to reduce perceived latency for the player, without cleaning the dialogue history.",
+    "/generate-dialogue",
+    response_model=None,
+    summary="Generate NPC Dialogue",
+    description=(
+        "Generates the NPC dialogue and the available player responses. "
+        "If `last_player_choice` is omitted a new dialogue is started (history cleared), "
+        "otherwise the dialogue is continued. With `stream=true` the dialogue is streamed as plain text."
+    ),
     responses={
         **ALL_ERROR_RESPONSES,
-        200: {"description": "Stream of dialogue text."}
+        200: {
+            "description": "Dialogue generated successfully.",
+            "content": {
+                "application/json": {"schema": ComposedDialogue.model_json_schema()},
+                "text/plain": {"schema": {"type": "string"}},
+            },
         },
+    },
 )
-def continue_dialogue_stream(request: DialogueStreamRequest, service: GenerateService = Depends(get_generate_service)):
+def generate_dialogue(request: GenerateDialogueRequest, service: GenerateService = Depends(get_generate_service)) -> ComposedDialogue | StreamingResponse:
 
-    result: DialogueStream = service.continue_stream(request.npc_context, request.last_player_choice)
-    return StreamingResponse(result.chunks, media_type="text/plain")
+    if request.stream:
+        dialogue_stream: DialogueStream = service.generate_dialogue_stream(
+            request.npc_context, request.last_player_choice
+        )
+        return StreamingResponse(
+            dialogue_stream.chunks,
+            media_type="text/plain",
+        )
+
+    dialogue = service.generate_dialogue(request.npc_context, request.last_player_choice)
+
+    if dialogue is None:
+        raise MiddlewareError(
+            code=MiddlewareErrorCode.REFUSED,
+            errors=["Dialogue generation was refused."],
+        )
+
+    return dialogue

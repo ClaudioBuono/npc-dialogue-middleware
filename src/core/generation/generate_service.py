@@ -69,47 +69,50 @@ class GenerateService:
         pre_processing.normalize_and_validate_game_context(game_context)
         self._orchestrator.set_game_context(game_context)
 
-    def generate(self, npc_context: NPCContext) -> ComposedDialogue:
+    def generate_dialogue(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> ComposedDialogue:
         """
-        Generate a dialogue using the provided NPC context.
+        Generate a dialogue using the provided NPC context and last player choice.
         """
         self._ensure_context_set()
         self._ensure_idle()
         npc_context = self._validate_and_normalize_npc_context(npc_context)
+    
+        # New dialogue
+        if last_player_choice is None:
+            self._dialogue_history.clear_dialogue_history()
+            dialogue = self._orchestrator.generate_dialogue(npc_context, None)
 
-        dialogue = self._orchestrator.generate_dialogue(npc_context, None)
+        # Continue dialogue
+        else:
+            self._ensure_history_not_empty()
+            dialogue = self._orchestrator.generate_dialogue(npc_context, last_player_choice)
 
         if dialogue is None:
             raise MiddlewareError(code=MiddlewareErrorCode.REFUSED, errors=["Dialogue generation was refused."])
 
         return dialogue
+     
 
-    def start_stream(self, npc_context: NPCContext) -> DialogueStream:
+    def generate_dialogue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> DialogueStream:
         """
-        Start a dialogue stream using the provided NPC context.
+        Generate a dialogue using the provided NPC context and last player choice.
         """
         self._ensure_context_set()
         self._ensure_idle()
-
         npc_context = self._validate_and_normalize_npc_context(npc_context)
 
-        self._dialogue_history.clear_dialogue_history()
+        # New dialogue
+        if last_player_choice is None:
+            self._dialogue_history.clear_dialogue_history()
+            chunks = self._safe_stream(npc_context, last_player_choice=None)
 
-        chunks = self._safe_stream(npc_context, last_player_choice=None)
+        # Continue dialogue
+        else:
+            self._ensure_history_not_empty()
+            chunks = self._safe_stream(npc_context, last_player_choice=last_player_choice)
+
         return DialogueStream(chunks)
 
-    def continue_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> DialogueStream:
-        """
-        Continue a dialogue stream using the provided NPC context and last player choice.
-        """
-        self._ensure_context_set()
-        self._ensure_history_not_empty()
-        self._ensure_idle()
-
-        npc_context = self._validate_and_normalize_npc_context(npc_context)
-
-        chunks = self._safe_stream(npc_context, last_player_choice=last_player_choice)
-        return DialogueStream(chunks)
 
     def _safe_stream(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> Iterator[str]:
         """

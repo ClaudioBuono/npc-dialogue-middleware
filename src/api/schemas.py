@@ -92,3 +92,9 @@ class IntegerRequest(BaseModel):
 class SettingsUpdatedResponse(BaseModel):
     """Generic confirmation payload returned by settings-update endpoints."""
     status: str = "ok"
+
+class GenerateDialogueRequest(BaseModel):
+    """Dialogue request body for generating a dialogue response."""
+    npc_context: NPCContext
+    last_player_choice: str | None = None
+    stream: bool = False
