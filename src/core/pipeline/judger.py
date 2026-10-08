@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import re
 import time 
 from pydantic import ValidationError
 from api.schemas import ComposedDialogue
@@ -10,6 +11,7 @@ from core.llm.openai_client import OpenAICompatibleClient
 from core.pipeline.guardrail import Guardrail
 from core.tools.errors import MiddlewareError, MiddlewareErrorCode, PreProcessingError, ValidationErrorCode
 from core.tools.judge_questions import build_judge_questions
+from core.tools.language_detector import find_foreign_words
 from core.types.contexts import NPCContext
 from core.types.dataclasses import JudgeIssue, JudgeOutput, JudgeProblem, JudgeQuestion
 
@@ -69,7 +71,6 @@ class Judger:
         """
         judge_questions = build_judge_questions(
             npc_context=npc_context,
-            language=Settings().language,
             fairness=Settings().fairness_filter,
             profanity=Settings().profanity_filter,
         )
@@ -225,10 +226,12 @@ class Judger:
             self._check_option_count(composed_dialogue),
             self._check_accept_refuse(composed_dialogue, npc_context),
             self._check_banned_words(composed_dialogue),
+            self._check_language(composed_dialogue, npc_context)
         )
         issues = [issue for issue in checks if issue is not None]
         logger.debug("Static checks: %d/%d violated", len(issues), len(checks))
         return issues
+    
 
     def _check_mandatory_expression(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext) -> JudgeIssue | None:
         """
@@ -303,3 +306,45 @@ class Judger:
         """Build the feedback message to send to the judge on retry."""
         details = "\n".join(f'- id="{a.id}": reason={a.reason!r}' for a in bad_reasons)
         return details
+
+    def _check_language(self, composed_dialogue: ComposedDialogue, npc_context: NPCContext) -> JudgeIssue | None:
+        """Check that the dialogue and the player options are written in the configured language.
+
+        Each section (dialogue, options, accept, refuse) is checked separately.
+        A section is reported if it contains at least one foreign word.
+
+        Returns:
+            A JudgeIssue listing the offending section names, or None.
+        """
+        expected = Settings().language
+
+        # Ignore the NPC name in the check.
+        ignore = {w.lower() for w in re.findall(r"\w+", npc_context.name or "")}
+
+        # Section name -> list of texts belonging to that section
+        sections: dict[str, list[str]] = {"dialogue": [composed_dialogue.dialogue]}
+        player_options = composed_dialogue.player_options
+        if player_options is not None:
+            if accept := getattr(player_options, "accept", None):
+                sections["accept"] = [accept]
+            if refuse := getattr(player_options, "refuse", None):
+                sections["refuse"] = [refuse]
+            if dialogue_options := getattr(player_options, "dialogue_options", None):
+                sections["options"] = list(dialogue_options)
+
+        wrong_sections = [
+            name
+            for name, texts in sections.items()
+            if any(find_foreign_words(text, expected, ignore) for text in texts)
+        ]
+
+        if wrong_sections:
+            logger.debug("Language mismatch in sections: %s (expected=%s)", wrong_sections, expected.name)
+            return JudgeIssue(
+                category="Language mismatch",
+                issue=(
+                    f"The text must be written entirely in {expected.name}, "
+                    f"but these sections contain words from another language: {', '.join(wrong_sections)}"
+                ),
+            )
+        return None

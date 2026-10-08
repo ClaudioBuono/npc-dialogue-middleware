@@ -80,7 +80,7 @@ def build_persona_questions() -> list[JudgeQuestion]:
     return list(PERSONA_QUESTIONS)
 
 
-def build_rules_questions(npc_context: NPCContext, language: Language) -> list[JudgeQuestion]:
+def build_rules_questions(npc_context: NPCContext) -> list[JudgeQuestion]:
     """Build the questions about format rules of the dialogue.
 
     Always includes the language and no-narration checks. For intents that
@@ -96,10 +96,6 @@ def build_rules_questions(npc_context: NPCContext, language: Language) -> list[J
         The list of rule questions applicable to the given context.
     """
     questions = [
-        JudgeQuestion(
-            id="language",
-            text=f"Is the entire dialogue written in {language.name}, with no other language mixed in?",
-        ),
         NO_NARRATION_QUESTION,
     ]
 
@@ -116,7 +112,7 @@ def build_rules_questions(npc_context: NPCContext, language: Language) -> list[J
     return questions
 
 
-def build_judge_questions(npc_context: NPCContext, language: Language, fairness: bool, profanity: bool) -> list[JudgeQuestion]:
+def build_judge_questions(npc_context: NPCContext, fairness: bool, profanity: bool) -> list[JudgeQuestion]:
     """Build the full list of questions to submit to the judge.
 
     Args:
@@ -129,7 +125,7 @@ def build_judge_questions(npc_context: NPCContext, language: Language, fairness:
         Persona questions, rule questions and, if enabled, the fairness
         and profanity questions, in this order.
     """
-    questions = build_persona_questions() + build_rules_questions(npc_context, language)
+    questions = build_persona_questions() + build_rules_questions(npc_context)
     if fairness:
         questions.append(FAIRNESS_QUESTION)
     if profanity:
