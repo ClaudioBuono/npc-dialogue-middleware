@@ -1,10 +1,9 @@
 import dataclasses
 import json
 from typing import List, Union
-
 from pydantic import BaseModel
-
 from api.schemas import ComposedDialogue
+from core.helpers.security import sanitize_field
 from core.types.contexts import Dialogue, GameContext, NPCContext, Quest
 from core.types.dataclasses import JudgeIssue, JudgeQuestion
 
@@ -24,16 +23,18 @@ def format_dialogue_history(history: list[dict[str, str]], npc_name: str) -> str
     """
     if not history:
         return ""
+    
+    safe_name = sanitize_field(npc_name, 80)
 
     lines = []
     for turn in history:
         if not turn:
             continue
         speaker, content = next(iter(turn.items()))
-        content = content.strip()
+        content = sanitize_field(content, 500)  # also strips newlines: no fake turns
 
         if speaker == "NPC":
-            lines.append(f'- {npc_name}: "{content}"')
+            lines.append(f'- {safe_name}: "{content}"')
         else:
             lines.append(f"- Player: {content}")
 
@@ -58,8 +59,13 @@ def to_json_format(obj) -> str:
         return str(o)
     return json.dumps(obj, default=custom_encoder, indent=2, ensure_ascii=False)
 
+def format_stream(text: str) -> str:
+    try:
+        return json.dumps(json.loads(text), indent=2, ensure_ascii=False)
+    except json.JSONDecodeError:
+        return text
 
-def format_composed_dialogue(composed_dialogue: ComposedDialogue) -> str:
+def format_composed_dialogue(composed_dialogue: ComposedDialogue, include_intent: bool) -> str:
     """Format a ComposedDialogue instance into human-readable text for an LLM prompt.
 
     Args:
@@ -68,10 +74,11 @@ def format_composed_dialogue(composed_dialogue: ComposedDialogue) -> str:
     Returns:
         str: Structured textual representation formatted with markdown sections.
     """
-    sections = [
-        _format_intent(composed_dialogue.intent),
-        f"Dialogue line:\n{composed_dialogue.dialogue}",
-    ]
+    sections = []
+    if include_intent: 
+        sections.append(_format_intent(composed_dialogue.intent))
+
+    sections.append(f"Dialogue line:\n{composed_dialogue.dialogue}")
 
     options_block = _format_player_options(composed_dialogue.player_options)
     if options_block:
@@ -197,26 +204,24 @@ def format_npc_context(npc_context: NPCContext) -> str:
         str: Structured textual representation formatted with markdown list items.
     """
     lines = [
-        f"- Name: {npc_context.name}",
-        f"- Age: {npc_context.age}",
-        f"- Personality: {npc_context.personality}",
-        f"- Current context: {npc_context.context}",
-        f"- Talkativeness: {npc_context.talkativeness.value}",
-        f"- Relation to main character: {npc_context.main_character_relation}",
+        f"- Name: {sanitize_field(npc_context.name, 80)}",
+        f"- Age: {sanitize_field(npc_context.age, 20)}",
+        f"- Personality: {sanitize_field(npc_context.personality)}",
+        f"- Current context: {sanitize_field(npc_context.context)}",
+        f"- Talkativeness: {npc_context.talkativeness.value}",  # enum, no escape needed
+        f"- Relation to main character: {sanitize_field(npc_context.main_character_relation)}",
     ]
 
     if npc_context.visual_description:
-        lines.append(f"- Visual description: {npc_context.visual_description}")
+        lines.append(f"- Visual description: {sanitize_field(npc_context.visual_description)}")
     if npc_context.backstory:
-        lines.append(f"- Backstory: {npc_context.backstory}")
+        lines.append(f"- Backstory: {sanitize_field(npc_context.backstory, 1000)}")
     if npc_context.recent_plot:
-        lines.append(f"- Recent plot relevant to this NPC: {npc_context.recent_plot}")
+        lines.append(f"- Recent plot relevant to this NPC: {sanitize_field(npc_context.recent_plot, 500)}")
     if npc_context.language:
-        lines.append(f"- Spoken languages: {', '.join(npc_context.language)}")
+        lines.append(f"- Spoken languages: {', '.join(sanitize_field(l, 40) for l in npc_context.language)}")
 
-    npc_block = "\n".join(lines)
-
-    return f"{npc_block}"
+    return "\n".join(lines)
 
 
 def format_game_context(game_context: GameContext) -> str:
@@ -232,12 +237,36 @@ def format_game_context(game_context: GameContext) -> str:
         str: Structured textual representation formatted with markdown list items.
     """
     lines = [
-        f"- Epoch: {game_context.epoch}",
-        f"- Environment: {game_context.environment}",
-        f"- Current world state: {game_context.world_state}",
+        f"- Epoch: {sanitize_field(game_context.epoch, 80)}",
+        f"- Environment: {sanitize_field(game_context.environment)}",
+        f"- Current world state: {sanitize_field(game_context.world_state)}",
     ]
 
     if game_context.main_character_description:
-        lines.append(f"- Main character appearance: {game_context.main_character_description}")
+        lines.append(f"- Main character appearance: {sanitize_field(game_context.main_character_description)}")
+
+    return "\n".join(lines)
+
+def format_intent_data(intent: Union[Quest, Dialogue]) -> str:
+    """Data-only view of the intent for generation (no control flags)."""
+    lines = []
+
+    lines.append(f"- Type: {intent.type}")
+
+    if intent.must_use_expression:
+        lines.append(f'- Required expression: "{sanitize_field(intent.must_use_expression, 200)}"')
+    if intent.more_info:
+        lines.append(f"- Additional context: {sanitize_field(intent.more_info, 500)}")
+
+    if intent.type == "Quest":
+        lines.append(f"- Objective: {sanitize_field(intent.objective)}")
+        for label, value in (
+            ("Quest name", intent.name),
+            ("Description", intent.description),
+            ("Location", intent.location),
+            ("Reward", intent.reward),
+        ):
+            if value:
+                lines.append(f"- {label}: {sanitize_field(value)}")
 
     return "\n".join(lines)

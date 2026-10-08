@@ -118,6 +118,7 @@ class Judger:
                     sorted(expected - received), sorted(received - expected),
                     len(judge_questions), len(candidate.answers),
                 )
+                # TODO: not fail but give feedback
                 raise MiddlewareError(
                     code=MiddlewareErrorCode.INVALID_RESPONSE,
                     errors=["There was a problem during the judging process."],

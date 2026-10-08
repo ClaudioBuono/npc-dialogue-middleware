@@ -12,7 +12,7 @@ from core.generation.history import DialogueHistory
 from core.llm.openai_client import OpenAICompatibleClient
 from core.generation.output_composer import DialogueOutputComposer
 from core.routing.router import LLMRouter
-from core.helpers.formatters import to_json_format
+from core.helpers.formatters import format_composed_dialogue, format_stream, to_json_format
 from core.types.contexts import GameContext, NPCContext
 from core.types.enums import MiddlewareState
 
@@ -122,6 +122,7 @@ class Orchestrator:
             StateManager().transition_to(MiddlewareState.IDLE)
 
         logger.info("Dialogue generated for NPC %r in %.2fs", npc_context.name, time.perf_counter() - start)
+        logger.info("Generated dialogue:\n%s", format_composed_dialogue(composed_dialogue, include_intent=False))
         return composed_dialogue
 
     
@@ -144,11 +145,13 @@ class Orchestrator:
                 released.append(text)
                 yield text
 
-            self._save_streamed_dialogue(npc_context, "".join(released))
+            full_text = "".join(released)
+            self._save_streamed_dialogue(npc_context, full_text)
         finally:
             StateManager().transition_to(MiddlewareState.IDLE)
 
         logger.info("Dialogue stream completed for NPC %r in %.2fs", npc_context.name, time.perf_counter() - start)
+        logger.info("Generated stream:\n%s", format_stream(full_text))
 
     # Pipeline Methods ----------------------------------------------------------------------------
     def _generate_dialogue(self, npc_context: NPCContext, last_player_choice: Optional[str]) -> ComposedDialogue | None:

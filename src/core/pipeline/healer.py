@@ -6,7 +6,6 @@ from api.schemas import ComposedDialogue
 from core.configuration.settings import Settings
 from core.generation.contract_builder import ContractBuilder
 from core.generation.output_composer import DialogueOutputComposer
-from core.helpers.formatters import format_composed_dialogue
 from core.llm.openai_client import OpenAICompatibleClient
 from core.tools.errors import PreProcessingError, ValidationErrorCode
 from core.tools.errors import PreProcessingError

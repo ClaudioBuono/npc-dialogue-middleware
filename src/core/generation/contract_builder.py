@@ -1,7 +1,7 @@
 from typing import Any, Dict
 from api.schemas import ComposedDialogue
 from core.configuration.settings import Settings
-from core.helpers.formatters import format_composed_dialogue, format_dialogue_history, format_game_context, format_judge_issues, format_judge_questions, format_npc_context
+from core.helpers.formatters import format_composed_dialogue, format_dialogue_history, format_game_context, format_intent_data, format_judge_issues, format_judge_questions, format_npc_context
 from core.types.dataclasses import Contract, JudgeIssue, JudgeQuestion
 from core.types.contexts import *
 from core.llm.prompts import *
@@ -32,31 +32,14 @@ class ContractBuilder:
         """
 
         # Builds System prompt
-        system_prompt = self._build_dialogue_system_prompt(game_context)
-
-        # Quest Intent
-        if isinstance(npc_context.intent, Quest):
-            user_prompt = self._build_user_prompt_quest(npc_context, dialogue_history)
-            output_schema = self._build_output_schema(npc_context)
-
-            return Contract(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                output_schema=output_schema
-            )
-        
-        # Dialogue Intent
-        if isinstance(npc_context.intent, Dialogue):
-            user_prompt = self._build_user_prompt_dialogue(npc_context, dialogue_history)
-            output_schema = self._build_output_schema(npc_context)
-
-            return Contract(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                output_schema=output_schema
-            )
-
-        raise ValueError(f"Unsupported intent type: {type(npc_context.intent)}")
+        system_prompt = self._build_dialogue_system_prompt(npc_context)
+        user_prompt = self._build_dialogue_user_prompt(game_context, npc_context, dialogue_history)
+        output_schema = self._build_output_schema(npc_context)
+        return Contract(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            output_schema=output_schema
+        )
 
 
     def build_judge_contract(
@@ -130,165 +113,104 @@ class ContractBuilder:
 
     # Helper methods for Dialogue prompt -------------------------------------------------------
 
-    def _build_dialogue_system_prompt(self, game_context: GameContext) -> str:
-        """Builds the common part of the system prompt, shared across all dialogue intents.
+    def _build_dialogue_system_prompt(self, npc_context: NPCContext) -> str:
+        """Builds the system prompt shared across all dialogue intents."""
+        settings = Settings()
+        intent = npc_context.intent
 
-        Establishes the model's role, the game world context, and general output
-        rules.
-        """
-        world_context = WORLD_CONTEXT_TEMPLATE.format(
-            environment=game_context.environment,
-            epoch=game_context.epoch,
-            world_state=game_context.world_state,
-        )
+        is_quest = intent.type != "Dialogue"
+        has_options = intent.has_options
+        has_choice = is_quest and intent.has_choice  # accept/refuse exist only for quests
 
-        prompts = [
+        blocks = [
             ROLE_PROMPT,
-            LANGUAGE_RULE_TEMPLATE.format(language = Settings().language.name),
-            world_context,
+            INPUT_FORMAT_PROMPT,
+            SECURITY_RULES_PROMPT,
+            INTENT_FIELDS_PROMPT,
+            LANGUAGE_RULE_TEMPLATE.format(language=settings.language.name),
+            CONTENT_RULES_PROMPT,
         ]
 
-        if game_context.main_character_description:
-            prompts.append(
-                MAIN_CHARACTER_TEMPLATE.format(
-                    main_character_description=game_context.main_character_description
-                )
-            )
+        if is_quest:
+            blocks.append(QUEST_CONTENT_RULES_PROMPT)
 
-        prompts.append(GENERAL_RULES_PROMPT)
+        blocks += [GROUNDING_RULES_PROMPT, STYLE_RULES_PROMPT]
 
-        if Settings().fairness_filter:
-            prompts.append(FAIRNESS_BASE_RULES_PROMPT)
+        if settings.fairness_filter:
+            blocks.append(FAIRNESS_BASE_RULES_PROMPT)
 
-        return "\n\n".join(prompts)
+        blocks += [NPC_FIELD_GUIDANCE_PROMPT, TALKATIVENESS_GUIDE_PROMPT]
 
+        player_options = self._build_player_options_section(
+            has_options=has_options,
+            has_choice=has_choice,
+            number_of_options=settings.number_of_options,
+        )
+        if player_options:
+            blocks.append(player_options)
+
+        blocks.append(OUTPUT_FORMAT_PROMPT)
+
+        return "\n\n".join(blocks)
+
+
+    @staticmethod
+    def _build_player_options_section(has_options: bool, has_choice: bool, number_of_options: int) -> str | None:
+        """Single '# PLAYER OPTIONS' section, composed from independent parts."""
+        if not (has_options or has_choice):
+            return None
+
+        lines = [PLAYER_OPTIONS_HEADER_PROMPT]
+
+        if has_options:
+            lines.append(DIALOGUE_OPTIONS_TEMPLATE.format(number_of_options=number_of_options))
+        if has_choice:
+            lines.append(QUEST_CHOICE_PROMPT)
+        if has_options and has_choice:
+            lines.append(DIALOGUE_OPTIONS_NO_DECISION_PROMPT)
+
+        return "\n".join(lines)  # single newline: it's one section
+
+
+    def _build_dialogue_user_prompt(self, game_context: GameContext, npc_context: NPCContext, history: List[Dict[str,str]]) -> str:
+        settings = Settings()
+        intent = npc_context.intent
+        is_quest = intent.type != "Dialogue"
+
+        history_text = format_dialogue_history(history, npc_context.name)
+        intent_text = format_intent_data(intent)
+
+        blocks = [
+            WORLD_CONTEXT_TEMPLATE.format(game_context=format_game_context(game_context)),
+            NPC_TEMPLATE.format(npc_context=format_npc_context(npc_context)),
+        ]
+        if history_text:
+            blocks.append(DIALOGUE_HISTORY_TEMPLATE.format(dialogue_history=history_text))
+        if intent_text:
+            blocks.append(INTENT_TEMPLATE.format(intent_data=intent_text))
+
+        has_choice = is_quest and intent.has_choice
+        blocks.append(self._build_task_section(
+            is_quest, intent.has_options, has_choice, settings.number_of_options
+        ))
+
+        return "\n\n".join(blocks)
     
-    def _build_prompt_npc_context(self, npc_context: NPCContext, dialogue_history: List[Dict[str,str]]) -> str:
-        """
-        Builds the formatted NPC prompt context from the provided NPC data.
-        Iterates through required fields (name, age, personality, etc.) and 
-        appends optional background or behavioral fields if they are available.
-        """
-        
-        lines = [
-            NPC_CONTEXT_BASE_QUEST_PROMPT if isinstance(npc_context.intent, Quest) else NPC_CONTEXT_BASE_DIALOGUE_PROMPT,
-            NPC_FIELDS_TEMPLATE.format(
-                name = npc_context.name,
-                age = npc_context.age,
-                personality = npc_context.personality,
-                context = npc_context.context,
-                talkativeness = npc_context.talkativeness.value,
-                main_character_relation = npc_context.main_character_relation
-            )
-        ]
+    @staticmethod
+    def _build_task_section(is_quest: bool, has_options: bool, has_choice: bool, number_of_options: int) -> str:
+        lines = [TASK_QUEST_PROMPT if is_quest else TASK_DIALOGUE_PROMPT]
 
-        if npc_context.recent_plot:
-            lines.append(f"- Recent Events: {npc_context.recent_plot}")
-        if npc_context.visual_description:
-            lines.append(f"- Visual Description: {npc_context.visual_description}")
-        if npc_context.backstory:
-            lines.append(f"- Backstory: {npc_context.backstory}")
-        if npc_context.language:
-            lines.append(f"- Language: {npc_context.language}")
+        deliverables = [TASK_DIALOGUE_FIELD_PROMPT]
+        if has_options:
+            deliverables.append(TASK_OPTIONS_FIELD_TEMPLATE.format(number_of_options=number_of_options))
+        if has_choice:
+            deliverables.append(TASK_CHOICE_FIELD_PROMPT)
 
-        if npc_context.intent.more_info:
-            lines.append(f"- Additional informations: {npc_context.intent.more_info}")
+        # Only mention the output list when there is more than the dialogue itself
+        if len(deliverables) > 1:
+            lines += ["", TASK_OUTPUT_HEADER_PROMPT, *deliverables]
 
-
-        result = "\n".join(lines)
-
-        if dialogue_history:
-            dialogue_history_prompt = DIALOGUE_HISTORY_TEMPLATE.format(dialogue_history = format_dialogue_history(dialogue_history, npc_context.name))
-
-            result = "\n".join(
-                [
-                    result,
-                    dialogue_history_prompt
-                ]
-            )
-
-        return result
-
-
-    def _build_prompt_quest(self, quest: Quest) -> str:
-        """
-        Builds the prompt section specific to quest details when the intent is a Quest.
-        Maps out core quest parameters like objective, description, and rewards,
-        and appends specific prompts to handle quest acceptance/refusal branches.
-        """
-        lines = [
-            QUEST_BASE_PROMPT,
-            f"- Objective: {quest.objective}",
-        ]
-
-        if quest.name:
-            lines.append(f"- Name: {quest.name}")
-        if quest.description:
-            lines.append(f"- Description: {quest.description}")
-        if quest.location:
-            lines.append(f"- Location: {quest.location}")
-        if quest.reward:
-            lines.append(f"- Reward: {quest.reward}")
-
-        lines.append("\n")
-
-
-        result = "\n".join(lines)
-        return result
-
-    def _build_user_prompt_quest(self, npc_context: NPCContext, dialogue_history: List[Dict[str,str]]) -> str:
-        """
-        Merges the NPC context prompt, base Dialogue prompt and Quest prompt
-        for building the user prompt when the intent is a Quest.
-        """
-        npc_section = self._build_prompt_npc_context(npc_context, dialogue_history)
-        quest_section = self._build_prompt_quest(npc_context.intent)
-
-        result = "\n".join([npc_section, DIALOGUE_BASE_PROMPT, quest_section])
-
-        if npc_context.intent.has_choice or npc_context.intent.has_options or npc_context.intent.must_use_expression:
-            rules_section = self._build_rules(npc_context.intent)
-            result = "\n".join([result, rules_section])
-
-        result = "\n".join([result, GROUNDING_RULES_PROMPT])
-
-        return result
-
-    def _build_user_prompt_dialogue(self, npc_context: NPCContext, dialogue_history: List[Dict[str,str]]) -> str:
-        """
-        Merges the NPC context prompt and base Dialogue prompt for building
-        the user prompt when the intent is a plain Dialogue (no quest).
-        """
-        npc_section = self._build_prompt_npc_context(npc_context, dialogue_history)
-        rules_section = self._build_rules(npc_context.intent)
-
-        result = "\n".join([npc_section, DIALOGUE_BASE_PROMPT])
-
-        if npc_context.intent.has_options or npc_context.intent.must_use_expression:
-            rules_section = self._build_rules(npc_context.intent)
-            result = "\n".join([result, rules_section])
-
-        return result
-
-    def _build_rules(self, intent: Quest | Dialogue) -> str:
-
-        lines = [DIALOGUE_RULES_PROMPT]
-        
-        if isinstance(intent, Dialogue):
-            if intent.must_use_expression:
-                lines.append(f"- You MUST USE the following expression in the dialogue: {intent.must_use_expression}")
-
-            if intent.has_options:
-                lines.append(DIALOGUE_OPTIONS_TEMPLATE.format(number_of_options = Settings().number_of_options))
-
-
-        if isinstance(intent, Quest):
-            if intent.has_choice:
-                lines.append(QUEST_CHOICE_TEMPLATE.format(number_of_options = Settings().number_of_options))
-
-
-        result = "\n".join(lines)
-        return result
+        return "\n".join(lines)
 
     def _build_output_schema(self, npc_context: NPCContext) -> dict[str, Any]:
         """
@@ -404,7 +326,7 @@ class ContractBuilder:
         """
         Builds the user prompt for the Judge, which includes the formatted dialogue, NPC context, game context, and judge questions.
         """
-        formatted_dialogue = format_composed_dialogue(composed_dialogue)
+        formatted_dialogue = format_composed_dialogue(composed_dialogue, include_intent=True)
         formatted_npc_context = format_npc_context(npc_context)
         formatted_game_context = format_game_context(game_context)
 
@@ -492,7 +414,7 @@ class ContractBuilder:
         """
         Builds the user prompt for the Healer, which includes the formatted dialogue, game context, NPC context, judge found issues.
         """
-        formatted_dialogue = format_composed_dialogue(composed_dialogue)
+        formatted_dialogue = format_composed_dialogue(composed_dialogue, include_intent=True)
         formatted_npc_context = format_npc_context(npc_context)
         formatted_game_context = format_game_context(game_context)
 
