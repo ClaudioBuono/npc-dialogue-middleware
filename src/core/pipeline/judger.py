@@ -82,17 +82,21 @@ class Judger:
         judge_output: JudgeOutput | None = None
         feedback: str | None = None
 
+        # Initialize the retry loop to allow up to MAX_JUDGE_ATTEMPTS execution tries
         for attempt in range(1, MAX_JUDGE_ATTEMPTS + 1):
+            # Construct the prompt/contract for the Judge LLM including any feedback from prior failed attempts
             judge_contract = self.contract_builder.build_judge_contract(
                 composed_dialogue, game_context, npc_context, judge_questions, feedback,
             )
 
+            # Invoke the LLM client to get a raw response string
             try:
-                judge_output_raw = self._client.generate(judge_contract, Settings().llm.judger_temperature)  # TODO: Test higher temperatures
+                judge_output_raw = self._client.generate(judge_contract, Settings().llm.judger_temperature)
             except Exception:
                 logger.exception("Judge LLM call failed")
                 raise
 
+            # Validate that the raw LLM output conforms strictly to the expected Pydantic schema (JudgeOutput)
             try:
                 candidate = JudgeOutput.model_validate_json(judge_output_raw)
             except ValidationError as e:
@@ -105,6 +109,7 @@ class Judger:
                     errors=[f"Judge output does not match expected schema: {e}", f"Raw output: {judge_output_raw}"],
                 )
 
+            # Ensure that all expected evaluation questions were answered (no missing or extra IDs)
             if not self._check_valid_response(candidate, judge_questions):
                 expected = {q.id for q in judge_questions}
                 received = {a.id for a in candidate.answers}
@@ -118,6 +123,7 @@ class Judger:
                     errors=["There was a problem during the judging process."],
                 )
 
+            # Check whether the judge provided invalid or poorly formatted justifications/reasons
             bad_reasons = self._check_reasons(candidate)
             if bad_reasons:
                 logger.warning(
@@ -125,12 +131,15 @@ class Judger:
                     attempt, MAX_JUDGE_ATTEMPTS, len(bad_reasons),
                     ", ".join(f"{a.id}={a.reason!r}" for a in bad_reasons),
                 )
+                # Generate feedback describing the invalid reasons and retry the LLM call in the next iteration
                 feedback = self._build_reason_feedback(bad_reasons)
                 continue
 
+            # Successfully validated candidate response; save output and exit the retry loop
             judge_output = candidate
             break
 
+        # If all retry attempts failed to produce valid reasons, log an error and raise a MiddlewareError
         if judge_output is None:
             logger.error("Judge produced invalid reasons for %d consecutive attempts", MAX_JUDGE_ATTEMPTS)
             raise MiddlewareError(
@@ -138,7 +147,7 @@ class Judger:
                 errors=["There was a problem during the judging process."],
             )
 
-        # Extract problems (where the answer is False)
+        # Filter out successful checks to extract only failed evaluations (where answer is False)
         judge_problems: list[JudgeProblem] = [p for p in judge_output.answers if not p.answer]
         logger.info(
             "LLM judge: %d/%d checks failed%s",
@@ -146,11 +155,12 @@ class Judger:
             f" ({', '.join(p.id for p in judge_problems)})" if judge_problems else "",
         )
 
-        # Build issues array
+        # Convert LLM judge failures into standardized issues and combine them with deterministic static checks
         llm_issues = self._map_judge_issues(judge_problems)
         static_issues = self._judge_static_format(composed_dialogue, npc_context)
         issues = llm_issues + static_issues
 
+        # Log judgment outcomes (both category summary and detailed debugging info if enabled)
         if issues:
             logger.info(
                 "Judgment: %d issue(s) (llm=%d, static=%d): %s",
@@ -161,6 +171,8 @@ class Judger:
                 logger.debug("Issue details: %s", to_json_format(issues))
         else:
             logger.info("Judgment: no issues")
+
+        # Return the consolidated list of detected issues
         return issues
 
     # Helper methods --------------------------------------------------------------------------------

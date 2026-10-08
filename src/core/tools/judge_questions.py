@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from core.types.contexts import Dialogue, NPCContext
 from core.types.dataclasses import JudgeQuestion
-from core.types.enums import Language
 
 # Questions evaluating the quality of the dialogue with respect to the NPC and game context.
 PERSONA_QUESTIONS: tuple[JudgeQuestion, ...] = (
