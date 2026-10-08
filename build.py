@@ -130,7 +130,7 @@ def check_config_files_exist():
         if not (CONFIG_SRC / example_name).exists()
     ]
     
-    for filename in ["settings.yaml", "modelconfigs.json"]:
+    for filename in CONFIG_FILES.values():
         path = CONFIG_SRC / filename
         if not path.exists():
             missing.append(str(path))
