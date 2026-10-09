@@ -111,7 +111,8 @@ class Orchestrator:
         )
 
         try:
-            composed_dialogue = self._generate_dialogue(npc_context, last_player_choice)
+            with Settings.snapshot():
+                composed_dialogue = self._generate_dialogue(npc_context, last_player_choice)
         except Exception as e:
             logger.error(
                 "Dialogue generation failed after %.2fs (%s): %s",
@@ -130,6 +131,7 @@ class Orchestrator:
         """Generate NPC dialogue using the NPC and game context via streaming."""
 
         StateManager().transition_to(MiddlewareState.GENERATING)
+        snap = Settings.get_current()
         start = time.perf_counter()
         logger.info(
             "Generating dialogue stream: npc=%r, intent=%s, history_turns=%d, player_choice=%s",
@@ -138,15 +140,22 @@ class Orchestrator:
         )
 
         try:
-            raw_stream = self._start_dialogue_stream(npc_context, last_player_choice)
+            with Settings.snapshot(snap):
+                raw_stream = self._start_dialogue_stream(npc_context, last_player_choice)
 
             released: list[str] = []
-            for text in self._guarded_stream(raw_stream):
+            guarded = self._guarded_stream(raw_stream)
+            while True:
+                with Settings.snapshot(snap):
+                    text = next(guarded, None)
+                if text is None:
+                    break
                 released.append(text)
-                yield text
+                yield text          # fuori dal with
 
             full_text = "".join(released)
-            self._save_streamed_dialogue(npc_context, full_text)
+            with Settings.snapshot(snap):
+                self._save_streamed_dialogue(npc_context, full_text)
         finally:
             StateManager().transition_to(MiddlewareState.IDLE)
 

@@ -6,12 +6,15 @@ from enum import Enum
 from pathlib import Path
 from threading import RLock
 from blinker import Signal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from core.helpers.paths import resolve_config_file
 from core.types.enums import Language
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 logger = logging.getLogger(__name__)
 
+_snapshot: ContextVar["AppSettings | None"] = ContextVar("settings_snapshot", default=None)
 
 def _format_setting_value(value) -> str:
     """Compact, readable representation of a setting value for log messages."""
@@ -24,7 +27,7 @@ def _format_setting_value(value) -> str:
 
 class LLMSettings(BaseModel):
     """Configuration for the language model used to generate dialogue."""
-
+    model_config = ConfigDict(frozen=True)
     dialogue_generator_temperature: float = Field(0.7, ge=0.0, le=2.0)
     judger_temperature: float = Field(0.2, ge=0.0, le=2.0)
     healer_temperature: float = Field(0.4, ge=0.0, le=2.0)
@@ -32,7 +35,7 @@ class LLMSettings(BaseModel):
 
 class AppSettings(BaseModel):
     """User-configurable application settings, loaded from settings.yaml."""
-
+    model_config = ConfigDict(frozen=True)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     language: Language = Language.ENGLISH
     profiling: bool = False
@@ -90,10 +93,37 @@ class Settings:
         type(self)._settings = settings
 
     def __getattr__(self, item):
-        settings = type(self)._settings
+        settings = _snapshot.get()
+        if settings is None:
+            settings = type(self)._settings
         if settings is not None and hasattr(settings, item):
             return getattr(settings, item)
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
+
+    @classmethod
+    def get_current(cls) -> AppSettings:
+        snap = _snapshot.get()
+        if snap is not None:
+            return snap
+        cls._ensure_loaded()
+        return cls._settings
+
+    @classmethod
+    @contextmanager
+    def snapshot(cls, snap: "AppSettings | None" = None):
+        """Pin the settings seen by this context to a fixed snapshot.
+
+        Without arguments, snapshots the current settings. Pass an existing
+        snapshot to re-enter it (e.g. inside a streaming generator).
+        """
+        if snap is None:
+            cls._ensure_loaded()
+            snap = cls._settings
+        token = _snapshot.set(snap)
+        try:
+            yield snap
+        finally:
+            _snapshot.reset(token)
 
     @classmethod
     def configure(cls, config_dir: str | Path) -> None:
@@ -163,18 +193,17 @@ class Settings:
         with cls._lock:
             cls._ensure_loaded()
             old = getattr(cls._settings, name)
-            setattr(cls._settings, name, value)
+            if old == value:
+                logger.info("Setting '%s' unchanged: %s", name, _format_setting_value(value))
+                return False
+            cls._settings = cls._settings.model_copy(update={name: value})
             try:
                 cls.save()
             except Exception:
                 logger.exception("Failed to persist settings to disk: the change is applied in memory only")
 
-        if old == value:
-            logger.info("Setting '%s' unchanged: %s", name, _format_setting_value(value))
-            return False
-
-        logger.info("Setting '%s' changed: %s -> %s", name, _format_setting_value(old), _format_setting_value(value))
-        return True
+            logger.info("Setting '%s' changed: %s -> %s", name, _format_setting_value(old), _format_setting_value(value))
+            return True
 
     @classmethod
     def change_language(cls, language: Language) -> None:
@@ -206,8 +235,3 @@ class Settings:
     def update_refiner_max_iterations(cls, max_iterations: int) -> None:
         """Update the refiner max iterations and persist it."""
         cls._update("refiner_max_iterations", max_iterations)
-
-    @classmethod
-    def get_current(cls) -> AppSettings:
-        cls._ensure_loaded()
-        return cls._settings
