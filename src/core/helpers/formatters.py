@@ -142,7 +142,7 @@ def _format_intent(intent: Union[Quest, Dialogue]) -> str:
         lines.append(f'- MUST USE the following expression: "{intent.must_use_expression}"')
     if intent.more_info:
         lines.append(f"- Additional context: {intent.more_info}")
-    lines.append(f"- Should offer extra dialogue options: {'yes' if intent.has_options else 'no'}")
+    lines.append(f"- Should offer extra dialogue options: {'yes' if intent.number_of_options > 0 else 'no'}")
 
     if intent.type == "Quest":
         lines.append(f"- Objective: {intent.objective}")

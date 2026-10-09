@@ -236,7 +236,7 @@ class Judger:
         """
         checks = (
             self._check_mandatory_expression(composed_dialogue, npc_context),
-            self._check_option_count(composed_dialogue),
+            self._check_option_count(npc_context, composed_dialogue),
             self._check_accept_refuse(composed_dialogue, npc_context),
             self._check_banned_words(composed_dialogue),
             self._check_language(composed_dialogue, npc_context)
@@ -256,14 +256,14 @@ class Judger:
             return JudgeIssue(category="Must use expression", issue="Expression is not used in dialogue")
         return None
 
-    def _check_option_count(self, composed_dialogue: ComposedDialogue) -> JudgeIssue | None:
+    def _check_option_count(self, npc_context: NPCContext, composed_dialogue: ComposedDialogue) -> JudgeIssue | None:
         """
         Check if the number of player options in the dialogue matches the expected number.
         """
         options = composed_dialogue.player_options
         if not options or not options.dialogue_options:
             return None
-        expected = Settings().number_of_options
+        expected = npc_context.intent.number_of_options
         actual = len(options.dialogue_options)
         if actual != expected:
             logger.debug("Option count mismatch: expected=%d, actual=%d", expected, actual)

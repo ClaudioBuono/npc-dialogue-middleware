@@ -9,6 +9,8 @@ from core.tools.errors import PreProcessingError, MiddlewareError, MiddlewareErr
 from core.types.contexts import Dialogue, GameContext, NPCContext, Quest
 from core.types.dataclasses import Contract
 
+dummy_number_of_options = 3
+
 @pytest.fixture
 def mock_contract_builder():
     builder = MagicMock(spec=ContractBuilder)
@@ -178,12 +180,12 @@ def test_judge_static_format_no_expression_required_no_issue(judger, mock_client
     assert not any(i.category == "Must use expression" for i in issues)
 
 def test_judge_static_format_wrong_option_count(judger, mock_client, dummy_contexts, all_true_response):
-    """dialogue_options length differs from Settings().number_of_options."""
+    """dialogue_options length differs from dummy_number_of_options"""
     game_ctx, npc_ctx = dummy_contexts
     npc_ctx.intent.must_use_expression = None
     npc_ctx.intent.has_choice = False
 
-    expected_count = Settings().number_of_options
+    expected_count = dummy_number_of_options
     wrong_count_options = ["option"] * (expected_count + 1)
 
     composed_dialogue = ComposedDialogue(
@@ -202,12 +204,12 @@ def test_judge_static_format_wrong_option_count(judger, mock_client, dummy_conte
     assert any(i.category == "Number of options" for i in issues)
 
 def test_judge_static_format_correct_option_count_no_issue(judger, mock_client, dummy_contexts, all_true_response):
-    """dialogue_options length matches Settings().number_of_options exactly: no issue."""
+    """dialogue_options length matches dummy_number_of_options exactly: no issue."""
     game_ctx, npc_ctx = dummy_contexts
     npc_ctx.intent.must_use_expression = None
     npc_ctx.intent.has_choice = False
 
-    expected_count = Settings().number_of_options
+    expected_count = dummy_number_of_options
     correct_options = ["option"] * expected_count
 
     composed_dialogue = ComposedDialogue(

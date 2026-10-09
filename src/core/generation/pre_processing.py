@@ -264,6 +264,14 @@ def _validate_dialogue_base_fields(dialogue: Dialogue) -> _DialogueBaseFieldsRes
     if more_info is not None and len(more_info) > MAX_MORE_INFO_LENGTH:
         errors.append(f"Field 'intent.more_info' must not exceed {MAX_MORE_INFO_LENGTH} characters.")
 
+    number_of_options = dialogue.number_of_options
+    if isinstance(number_of_options, bool) or not isinstance(number_of_options, int):
+        errors.append("Field 'intent.number_of_options' must be an integer.")
+    elif not (0 <= number_of_options <= MAX_NUMBER_OF_OPTIONS_LENGTH):
+        errors.append(
+            f"Field 'intent.number_of_options' must be in the range 0 and {MAX_NUMBER_OF_OPTIONS_LENGTH}."
+        )
+
     return _DialogueBaseFieldsResult(
         must_use_expression=must_use_expression,
         more_info=more_info,
@@ -311,7 +319,7 @@ def _validate_quest(quest: Quest) -> _IntentValidationResult[Quest]:
         type="Quest",
         must_use_expression=base.must_use_expression,
         more_info=base.more_info,
-        has_options=quest.has_options,
+        number_of_options=quest.number_of_options,
         objective=objective,
         name=name,
         description=description,
@@ -339,6 +347,6 @@ def _validate_dialogue(dialogue: Dialogue) -> _IntentValidationResult[Dialogue]:
         type="Dialogue",
         must_use_expression=base.must_use_expression,
         more_info=base.more_info,
-        has_options=dialogue.has_options,
+        number_of_options=dialogue.number_of_options,
     )
     return _IntentValidationResult(normalized=normalized, errors=base.errors)

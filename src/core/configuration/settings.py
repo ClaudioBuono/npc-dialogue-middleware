@@ -41,7 +41,6 @@ class AppSettings(BaseModel):
     censor_word: str = "[CENSORED]"
     refine_dialogue: bool = True # Enables the refiner in Generate Mode
     refiner_max_iterations: int = 3
-    number_of_options: int = 2
 
 class Settings:
     """Singleton that loads the application configuration from a YAML file
@@ -187,11 +186,6 @@ class Settings:
     def toggle_fairness_filter(cls, flag: bool) -> None:
         """Enable or disable the prompt fairness filter and persist it."""
         cls._update("fairness_filter", flag)
-
-    @classmethod
-    def set_number_of_options(cls, value: int) -> None:
-        """Set the number of dialogue options per turn and persist it."""
-        cls._update("number_of_options", value)
 
     @classmethod
     def update_llm_settings(cls, llm_settings: LLMSettings) -> None:

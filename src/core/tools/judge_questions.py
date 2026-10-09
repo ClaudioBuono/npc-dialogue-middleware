@@ -105,7 +105,7 @@ def build_rules_questions(npc_context: NPCContext) -> list[JudgeQuestion]:
 
     if intent.has_choice:
         questions.append(CONSISTENT_CHOICES_QUESTION)
-    if intent.has_options:
+    if intent.number_of_options > 0:
         questions.append(CONSISTENT_OPTIONS_QUESTION)
 
     return questions

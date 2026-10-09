@@ -38,18 +38,6 @@ def toggle_fairness_filter(request: ToggleRequest):
     return {"status": "ok"}
 
 @router.post(
-    "/number-of-options",
-    response_model=SettingsUpdatedResponse,
-    summary="Set Number of Dialogue Options",
-    description="Sets how many player response options are generated per dialogue turn.",
-    responses={200: {"description": "Number of options updated successfully."}},
-)
-def set_number_of_options(request: IntegerRequest):
-    Settings().set_number_of_options(request.value)
-    return {"status": "ok"}
-
-
-@router.post(
     "/llm",
     response_model=SettingsUpdatedResponse,
     summary="Update LLM Settings",

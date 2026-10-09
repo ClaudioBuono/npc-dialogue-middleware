@@ -119,7 +119,7 @@ class ContractBuilder:
         intent = npc_context.intent
 
         is_quest = intent.type != "Dialogue"
-        has_options = intent.has_options
+        has_options = intent.number_of_options
         has_choice = is_quest and intent.has_choice  # accept/refuse exist only for quests
 
         blocks = [
@@ -144,7 +144,7 @@ class ContractBuilder:
         player_options = self._build_player_options_section(
             has_options=has_options,
             has_choice=has_choice,
-            number_of_options=settings.number_of_options,
+            number_of_options=npc_context.intent.number_of_options,
         )
         if player_options:
             blocks.append(player_options)
@@ -191,7 +191,7 @@ class ContractBuilder:
 
         has_choice = is_quest and intent.has_choice
         blocks.append(self._build_task_section(
-            is_quest, intent.has_options, has_choice, settings.number_of_options
+            is_quest, intent.number_of_options, has_choice, npc_context.intent.number_of_options
         ))
 
         return "\n\n".join(blocks)
@@ -253,17 +253,17 @@ class ContractBuilder:
     def _build_player_options_schema_dialogue(self, dialogue: Dialogue) -> dict[str, Any] | None:
         """
         Builds the base 'player_options' schema shared by every Dialogue intent
-        (Quest included), based on has_options.
+        (Quest included), based on dialogue.number_of_options.
         """
         properties: dict[str, Any] = {}
         required: list[str] = []
 
         # More dialogue options
-        if dialogue.has_options:
+        if dialogue.number_of_options > 0:
             properties["dialogue_options"] = {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": f"Must include {Settings().number_of_options} options the player can choose from in response (e.g. asking for more details)."
+                "description": f"Must include {dialogue.number_of_options} options the player can choose from in response (e.g. asking for more details)."
                             " Must NEVER include explicit Accept and Refuse options."
             }
             required.append("dialogue_options")

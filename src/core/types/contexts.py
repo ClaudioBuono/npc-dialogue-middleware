@@ -21,10 +21,10 @@ class Dialogue(BaseModel):
         description="Contextual details or background information to guide the generation and eventual player's dialogue choices.",
         examples=["The NPC is secretly hiding a stolen ring."]
     )
-    has_options: Optional[bool] = Field(
-        False,
-        description="If True, additional dialogue options should be generated (e.g. asking for details).",
-        examples=[True, False]
+    number_of_options: Optional[int] = Field(
+        0,
+        description="The number of options available for the player to choose from. If not specified, defaults to 0.",
+        examples=[1, 2]
     )
 
 class Quest(Dialogue):
