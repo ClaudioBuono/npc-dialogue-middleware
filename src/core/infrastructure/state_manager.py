@@ -1,7 +1,8 @@
+from contextlib import contextmanager
 from threading import Lock
 import logging
 from typing import Optional
-
+from core.tools.errors import MiddlewareError, MiddlewareErrorCode
 from core.types.enums import MiddlewareState
 
 
@@ -34,6 +35,16 @@ class StateManager:
         self._lock = Lock()  # Separate lock protecting reads/writes of _state
         self._state = initial_state
         self._initialized = True
+
+    @contextmanager
+    def require_idle(self):
+        with self._lock:
+            if self._state != MiddlewareState.IDLE:
+                raise MiddlewareError(
+                    code=MiddlewareErrorCode.GENERATING,
+                    errors=[f"Language cannot be changed while the middleware is '{self._state.value}'."],
+                )
+            yield
 
     @classmethod
     def reset_instance(cls) -> None:

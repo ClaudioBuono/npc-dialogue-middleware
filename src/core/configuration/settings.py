@@ -8,6 +8,8 @@ from threading import RLock
 from blinker import Signal
 from pydantic import BaseModel, ConfigDict, Field
 from core.helpers.paths import resolve_config_file
+from core.infrastructure.state_manager import StateManager
+from core.tools.errors import MiddlewareError
 from core.types.enums import Language
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -207,9 +209,14 @@ class Settings:
 
     @classmethod
     def change_language(cls, language: Language) -> None:
-        """Update the active language and persist it. Notifies listeners only if it changed."""
-        if cls._update("language", language):
-            cls.language_changed.send(cls, language=language)
+        try: 
+            with StateManager().require_idle():
+                changed = cls._update("language", language)
+                if changed:
+                    cls.language_changed.send(cls, language=language)
+        except MiddlewareError as e:
+            logger.warning("; ".join(e.errors))
+            raise
 
     @classmethod
     def toggle_fairness_filter(cls, flag: bool) -> None:
