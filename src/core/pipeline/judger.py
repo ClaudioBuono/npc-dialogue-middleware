@@ -20,6 +20,13 @@ logger = logging.getLogger(__name__)
 MIN_REASON_LENGTH = 15
 MAX_JUDGE_ATTEMPTS = 3
 
+# Matches stage directions / actions such as *sighs*, (smiles), [draws sword]
+STAGE_DIRECTION_PATTERN = re.compile(
+    r"\*[^*\n]+\*"      # *action*
+    r"|\([^()\n]+\)"    # (action)
+    r"|\[[^\[\]\n]+\]"  # [action]
+)
+
 class Judger:
     """
     Handles dialogue evaluation and compliance checking against defined game rules and context.
@@ -234,15 +241,19 @@ class Judger:
             A list of JudgeIssue instances for each static rule violated.
             Empty if no violations are found.
         """
+
         checks = (
             self._check_mandatory_expression(composed_dialogue, npc_context),
             self._check_option_count(npc_context, composed_dialogue),
             self._check_accept_refuse(composed_dialogue, npc_context),
             self._check_banned_words(composed_dialogue),
-            self._check_language(composed_dialogue, npc_context)
+            self._check_language(composed_dialogue, npc_context),
+            self._check_stage_directions(composed_dialogue),
         )
+
         issues = [issue for issue in checks if issue is not None]
         logger.debug("Static checks: %d/%d violated", len(issues), len(checks))
+
         return issues
     
 
@@ -361,3 +372,44 @@ class Judger:
                 ),
             )
         return None
+
+    def _check_stage_directions(self, composed_dialogue: ComposedDialogue) -> JudgeIssue | None:
+        """Check that the dialogue does not contain stage directions or actions.
+
+        Detects text enclosed in asterisks (*action*), round brackets (action)
+        or square brackets [action]. Each section (dialogue, options, accept,
+        refuse) is checked separately.
+
+        Returns:
+            A JudgeIssue listing the offending sections and the matched
+            fragments, or None if no stage directions are found.
+        """
+        sections: dict[str, list[str]] = {"dialogue": [composed_dialogue.dialogue]}
+
+        player_options = composed_dialogue.player_options
+
+        if player_options is not None:
+            if accept := getattr(player_options, "accept", None):
+                sections["accept"] = [accept]
+            if refuse := getattr(player_options, "refuse", None):
+                sections["refuse"] = [refuse]
+            if dialogue_options := getattr(player_options, "dialogue_options", None):
+                sections["options"] = list(dialogue_options)
+
+        found: dict[str, list[str]] = {}
+
+        for name, texts in sections.items():
+            matches = [m for text in texts for m in STAGE_DIRECTION_PATTERN.findall(text)]
+            if matches:
+                found[name] = matches
+
+        if not found:
+            return None
+
+        logger.debug("Stage directions found: %s", found)
+        details = "; ".join(f"{name}: {', '.join(matches)}" for name, matches in found.items())
+        
+        return JudgeIssue(
+            category="Stage directions",
+            issue=f"The dialogue must not contain actions or stage directions ({details})",
+        )

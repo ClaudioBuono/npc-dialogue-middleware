@@ -72,7 +72,6 @@ def update_profanity_filter_settings(request: ToggleRequest):
 def update_censor_word(request: CensorWordRequest):
     censor_word: str = request.word
 
-    # TODO: Check for fairness in Settings
     Settings().update_censor_word(censor_word)
     return {"status": "ok"}
 
