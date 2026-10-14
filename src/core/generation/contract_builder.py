@@ -1,7 +1,7 @@
 from typing import Any, Dict
 from api.schemas import ComposedDialogue
 from core.configuration.settings import Settings
-from core.helpers.formatters import format_composed_dialogue, format_dialogue_history, format_game_context, format_intent_data, format_judge_issues, format_judge_questions, format_npc_context
+from core.helpers.formatters import format_composed_dialogue, format_dialogue_history, format_game_context, format_intent_data, format_judge_issues, format_judge_questions, format_npc_context, to_json_format
 from core.types.dataclasses import Contract, JudgeIssue, JudgeQuestion
 from core.types.contexts import *
 from core.llm.prompts import *
@@ -315,33 +315,36 @@ class ContractBuilder:
         """
         Builds the system prompt for the Judge, which includes the base prompt and rules.
         """
-        system_prompt_lines = [
+        return "\n\n".join([
             JUDGE_BASE_PROMPT,
             JUDGE_RULES_PROMPT,
-        ]
+        ])
 
-        return "\n\n".join(system_prompt_lines)
-
-    def _build_judge_user_prompt(self, composed_dialogue: ComposedDialogue, game_context: GameContext, npc_context: NPCContext, questions: List[JudgeQuestion]) -> str:
+    def _build_judge_user_prompt(
+        self,
+        composed_dialogue: ComposedDialogue,
+        game_context: GameContext,
+        npc_context: NPCContext,
+        questions: list[JudgeQuestion],
+    ) -> str:
         """
-        Builds the user prompt for the Judge, which includes the formatted dialogue, NPC context, game context, and judge questions.
+        Builds the user prompt for the Judge: the data (world context, NPC context,
+        dialogue) first, then the task with the questions as the last thing the model reads.
         """
-        formatted_dialogue = format_composed_dialogue(composed_dialogue, include_intent=True)
-        formatted_npc_context = format_npc_context(npc_context)
-        formatted_game_context = format_game_context(game_context)
-
         judge_body_prompt = JUDGE_BODY_TEMPLATE.format(
-            npc_context=formatted_npc_context,
-            game_context=formatted_game_context,
-            dialogue=formatted_dialogue,
+            game_context=format_game_context(game_context),
+            npc_context=format_npc_context(npc_context),
+            dialogue=format_composed_dialogue(composed_dialogue, include_intent=True),
         )
 
-        user_prompt_lines = [
-            JUDGE_TASK_TEMPLATE.format(questions=format_judge_questions(questions)),
-            judge_body_prompt,
-        ]
+        judge_task_prompt = JUDGE_TASK_TEMPLATE.format(
+            questions=format_judge_questions(questions),
+        )
 
-        return "\n\n".join(user_prompt_lines)
+        return "\n\n".join([
+            judge_body_prompt,
+            judge_task_prompt,
+        ])
 
 
     def _build_judge_output_schema(self, question_ids: list[str], include_reason: bool = True) -> dict[str, Any]:
@@ -403,30 +406,35 @@ class ContractBuilder:
         """
         Builds the system prompt for the Healer, which includes the base prompt and rules.
         """
-        system_prompt_lines = [
+        return "\n\n".join([
             HEALER_BASE_PROMPT,
             HEALER_RULES_PROMPT,
-        ]
+        ])
 
-        return "\n\n".join(system_prompt_lines)
-    
-    def _build_healer_user_prompt(self, composed_dialogue: ComposedDialogue, game_context: GameContext, npc_context: NPCContext, issues: list[JudgeIssue]) -> str:
+    def _build_healer_user_prompt(
+        self,
+        composed_dialogue: ComposedDialogue,
+        game_context: GameContext,
+        npc_context: NPCContext,
+        issues: list[JudgeIssue],
+    ) -> str:
         """
-        Builds the user prompt for the Healer, which includes the formatted dialogue, game context, NPC context, judge found issues.
+        Builds the user prompt for the Healer, which includes the task description,
+        the game context, the NPC context, the dialogue and the issues found by the judge.
         """
-        formatted_dialogue = format_composed_dialogue(composed_dialogue, include_intent=True)
+        formatted_dialogue = to_json_format(composed_dialogue)
         formatted_npc_context = format_npc_context(npc_context)
         formatted_game_context = format_game_context(game_context)
+        formatted_issues = format_judge_issues(issues)
 
         healer_body_prompt = HEALER_BODY_TEMPLATE.format(
-            npc_context=formatted_npc_context,
             game_context=formatted_game_context,
+            npc_context=formatted_npc_context,
             dialogue=formatted_dialogue,
+            issues=formatted_issues,
         )
 
-        user_prompt_lines = [
-            HEALER_TASK_TEMPLATE.format(issues=format_judge_issues(issues)),
+        return "\n\n".join([
+            HEALER_TASK_TEMPLATE,
             healer_body_prompt,
-        ]
-
-        return "\n\n".join(user_prompt_lines)
+        ])
