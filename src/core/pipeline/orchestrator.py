@@ -233,7 +233,7 @@ class Orchestrator:
         split across two chunks. Without a scanner the window is 0 and every chunk
         is released immediately.
         """
-        scanner = self.guardrail.get_streaming_scanner()
+        scanner = self.guardrail.get_streaming_scanner() if Settings().profanity_filter else None
         max_len = getattr(scanner, "_max_len", 0) if scanner else 0
         buffer = ""
 

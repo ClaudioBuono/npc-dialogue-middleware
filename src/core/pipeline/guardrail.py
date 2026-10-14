@@ -165,27 +165,27 @@ class Guardrail:
         """Replaces banned words with the word chosen in settings."""
 
         for term in terms:
-            pattern = re.compile(rf'\b{re.escape(term)}\b', re.IGNORECASE)
+            pattern = re.compile(rf'(?<!\w){re.escape(term)}(?!\w)', re.IGNORECASE)
             text = pattern.sub(Settings().censor_word, text)
         return text
 
     @staticmethod
     def _composed_output_to_text(composed_output: ComposedDialogue) -> str:
         """Flatten the scannable fields of a ComposedDialogue into a single string."""
+        
+        # Collect all text parts to be scanned
+        parts = [composed_output.dialogue]
+        options = composed_output.player_options
 
-        # Convert list fields to string, keeping existing strings intact
-        fields = [
-            composed_output.dialogue,
-            (
-                str(composed_output.player_options)
-                if isinstance(composed_output.player_options, list)
-                else composed_output.player_options
-            ),
-        ]
- 
-        # Combine all valid string fields into a single text payload for scanning
-        raw_text = " ".join(val for val in fields if isinstance(val, str))
-        return raw_text
+        if isinstance(options, QuestChoiceSchema):
+            # If options are a QuestChoiceSchema, add accept and refuse text
+            parts += [options.accept, options.refuse]
+        if isinstance(options, (QuestChoiceSchema, DialogueOptionsSchema)):
+            # If options are a DialogueOptionsSchema, add all dialogue options
+            parts += options.dialogue_options or []
+
+        # Join all parts into a single string and return
+        return " ".join(p for p in parts if p)
 
     def censor_composed_dialogue(self, composed_dialogue: ComposedDialogue) -> ComposedDialogue:
         """Censor the composed dialogue by redacting any terms that are flagged as derogatory."""
