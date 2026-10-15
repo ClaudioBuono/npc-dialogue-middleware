@@ -67,20 +67,29 @@ def test_generate_rate_limit(mock_telemetry, client, mock_openai_client, dummy_c
     assert exc_info.value.code == LLMClientErrorCode.RATE_LIMIT_ERROR
 
 def test_generate_streaming_success(client, mock_openai_client, dummy_contract):
-    # Setup mock response chunks
+    # Content chunks: usage is None, as in real streaming responses
     mock_chunk1 = MagicMock()
+    mock_chunk1.usage = None
     mock_chunk1.choices = [MagicMock()]
     mock_chunk1.choices[0].delta.content = '{"msg": '
-    
+
     mock_chunk2 = MagicMock()
+    mock_chunk2.usage = None
     mock_chunk2.choices = [MagicMock()]
     mock_chunk2.choices[0].delta.content = '"hi"}'
-    
-    mock_openai_client.chat.completions.create.return_value = iter([mock_chunk1, mock_chunk2])
-    
+
+    # Final chunk (stream_options include_usage): no choices, usage populated
+    mock_usage_chunk = MagicMock()
+    mock_usage_chunk.choices = []
+    mock_usage_chunk.usage.completion_tokens = 5
+
+    mock_openai_client.chat.completions.create.return_value = iter(
+        [mock_chunk1, mock_chunk2, mock_usage_chunk]
+    )
+
     stream = client.generate_streaming(dummy_contract, temperature=0.5)
     result = list(stream)
-    
+
     assert result == ['{"msg": ', '"hi"}']
     
 def test_empty_response(client, mock_openai_client, dummy_contract):
