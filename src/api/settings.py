@@ -27,11 +27,11 @@ def change_language(request: LanguageRequest):
     return {"status": "ok"}
 
 @router.post(
-    "/prompt-fairness-filter",
+    "/fairness-filter",
     response_model=SettingsUpdatedResponse,
-    summary="Toggle Prompt Fairness Filter",
-    description="Enables or disables the prompt fairness filter applied to incoming requests.",
-    responses={200: {"description": "Prompt fairness filter updated successfully."}},
+    summary="Toggle Fairness Filter",
+    description="Enables or disables the fairness filter applied to incoming requests.",
+    responses={200: {"description": "Fairness filter updated successfully."}},
 )
 def toggle_fairness_filter(request: ToggleRequest):
     Settings().toggle_fairness_filter(request.enabled)
@@ -49,11 +49,11 @@ def update_llm_settings(request: LLMSettings):
     return {"status": "ok"}
 
 @router.post(
-    "/profanity-mode",
+    "/profanity-filter",
     response_model=SettingsUpdatedResponse,
-    summary="Update profanity mode",
-    description="Updates the default profanity mode used for dialogue generation.",
-    responses={200: {"description": "Profanity mode updated successfully."}},
+    summary="Toggle Profanity Filter",
+    description="Enables or disables the profanity filter applied to incoming requests.",
+    responses={200: {"description": "Profanity filter updated successfully."}},
 )
 def update_profanity_filter_settings(request: ToggleRequest):
     Settings().update_profanity_filter_settings(request.enabled)
