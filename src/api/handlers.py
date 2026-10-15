@@ -45,7 +45,7 @@ async def preprocessing_error_handler(request: Request, exc: PreProcessingError)
     """422 - semantic validation errors on the incoming payload."""
     logger.warning("%s %s -> 422 %s: %s", request.method, request.url.path, exc.code.value, _short(exc.errors))
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
             "error_code": exc.code.value,
             "errors": exc.errors,
