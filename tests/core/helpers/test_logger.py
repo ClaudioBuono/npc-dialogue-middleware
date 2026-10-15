@@ -305,7 +305,7 @@ class TestSetupLogging:
         assert logging.getLogger("httpcore").level == logging.INFO
         assert logging.getLogger("httpx").level == logging.INFO
 
-    def test_setup_logging_reports_deleted_files(self, mock_base_path, restore_root_logger, caplog):
+    def test_setup_logging_reports_deleted_files(self, mock_base_path, restore_root_logger):
         """When old logs are deleted during startup, the deletion summary is logged."""
         root = restore_root_logger
         for h in list(root.handlers):
@@ -317,9 +317,11 @@ class TestSetupLogging:
         old_file = logs_dir / f"npc_middleware_{old_day.strftime(LOG_DATE_FORMAT)}.log"
         old_file.write_text("old", encoding="utf-8")
 
-        with caplog.at_level(logging.INFO):
-            setup_logging(level=logging.INFO)
+        setup_logging(level=logging.INFO)
 
         assert not old_file.exists()
-        assert f"Deleted 1 log file(s) older than {LOG_RETENTION_DAYS} days" in caplog.text
-        assert old_file.name in caplog.text
+
+        log_file = _daily_log_path()
+        content = log_file.read_text(encoding="utf-8")
+        assert f"Deleted 1 log file(s) older than {LOG_RETENTION_DAYS} days" in content
+        assert old_file.name in content

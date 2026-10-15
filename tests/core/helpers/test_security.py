@@ -89,9 +89,16 @@ class TestSanitizeFieldWhitespace:
     """Verification of whitespace collapsing and normalization."""
 
     def test_newlines_and_carriage_returns_collapsed(self):
-        """Newlines (\n) and carriage returns (\r) are replaced with a single space."""
-        raw = "Line 1\nLine 2\r\nLine 3\rLine 4"
+        """Newlines (\n) and CRLF (\r\n) are replaced with a single space."""
+        raw = "Line 1\nLine 2\r\nLine 3\nLine 4"
         assert sanitize_field(raw) == "Line 1 Line 2 Line 3 Line 4"
+
+    def test_lone_carriage_return_stripped_as_control_char(self):
+        """Standalone carriage return (\r, ASCII 0x0D) is stripped as a control character."""
+        # Without whitespace around it, \r is stripped by _CONTROL_CHARS so adjacent words join
+        assert sanitize_field("Line 3\rLine 4") == "Line 3Line 4"
+        # With surrounding whitespace, split() normalizes it to a single space
+        assert sanitize_field("Line 3 \r Line 4") == "Line 3 Line 4"
 
     def test_tabs_and_multiple_spaces_collapsed(self):
         """Consecutive tabs and spaces collapse to a single space."""

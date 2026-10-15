@@ -520,7 +520,7 @@ class TestFormatGameContext:
         gc = GameContext(
             epoch="<Sci-Fi>\nEra",
             environment="Dark <neon> streets\nwith acid rain",
-            world_state="AI <takeover>\rcompleted",
+            world_state="AI <takeover>\ncompleted",
             main_character_description="Rebel <leader>\narmed with EMP",
         )
         result = format_game_context(gc)
