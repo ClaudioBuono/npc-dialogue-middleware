@@ -204,3 +204,49 @@ def test_build_client_helper():
     
     assert isinstance(client, OpenAICompatibleClient)
     assert client.model_name == "m1"
+
+
+def test_base_profiler_is_abstract():
+    """Verifies that BaseProfiler cannot be instantiated directly."""
+    from core.routing.profiler import BaseProfiler
+    with pytest.raises(TypeError):
+        BaseProfiler()
+
+
+def test_probe_measurement_frozen():
+    """Verifies that _ProbeMeasurement instances are immutable (frozen dataclass)."""
+    measurement = _ProbeMeasurement(completion_time=1.0, ttft=0.5, throughput=10.0)
+    with pytest.raises((AttributeError, TypeError)):
+        measurement.completion_time = 2.0
+
+
+def test_profilers_empty_list():
+    """Verifies that both profilers return an empty list when given no models."""
+    assert SelfAssessmentProfiler().profile([]) == []
+    assert BenchmarkProfiler().profile([]) == []
+
+
+def test_measure_contract_and_zero_generation_time():
+    """Verifies the streaming Contract contents and that end == first_token_time does not divide by zero."""
+    from core.types.dataclasses import Contract
+    profiler = BenchmarkProfiler()
+    mock_client = MagicMock()
+    mock_client.generate_streaming.return_value = iter(["chunk1", "chunk2"])
+
+    # Simulate start=10.0, first_token=10.5, end=10.5 (i.e. end == first_token_time -> generation_time floored to 1e-6)
+    with patch("time.perf_counter", side_effect=[10.0, 10.5, 10.5]):
+        result = profiler._measure_time_to_first_token_and_throughput(mock_client)
+
+    # Check contract passed to generate_streaming
+    mock_client.generate_streaming.assert_called_once()
+    args, kwargs = mock_client.generate_streaming.call_args
+    contract = args[0]
+    assert isinstance(contract, Contract)
+    assert contract.system_prompt == "You are a test probe."
+    assert contract.user_prompt == "Reply with the single word: ready."
+    assert kwargs.get("temperature") == 0.0
+
+    # Ensure throughput was computed using 1e-6 without ZeroDivisionError
+    assert result.completion_time == 0.5
+    assert result.ttft == 0.5
+    assert result.throughput > 0.0

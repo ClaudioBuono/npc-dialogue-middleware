@@ -138,3 +138,66 @@ def test_load_config_from_file_failures(tmp_path):
     invalid_schema_file.write_text(yaml.safe_dump([{"id": "only-id"}]), encoding="utf-8")
     with pytest.raises(ValidationError):
         load_config_from_file(invalid_schema_file)
+
+    # 6. Empty YAML file (yaml.safe_load returns None -> non-list ValueError)
+    empty_yaml_file = tmp_path / "empty.yaml"
+    empty_yaml_file.write_text("", encoding="utf-8")
+    with pytest.raises(ValueError) as excinfo:
+        load_config_from_file(empty_yaml_file)
+    assert "Expected models_config to be a list" in str(excinfo.value)
+
+
+def test_load_config_from_file_os_error(tmp_path):
+    """Verifies that an OSError during read_text is wrapped in a ValueError."""
+    dummy_file = tmp_path / "unreadable.yaml"
+    dummy_file.write_text("dummy", encoding="utf-8")
+
+    from unittest.mock import patch
+    with patch("pathlib.Path.read_text", side_effect=OSError("Permission denied")):
+        with pytest.raises(ValueError) as excinfo:
+            load_config_from_file(dummy_file)
+        assert "Could not read config file" in str(excinfo.value)
+
+
+def test_load_config_from_file_string_path(tmp_path):
+    """Verifies that string paths (not just Path objects) are supported."""
+    valid_file = tmp_path / "valid_str.yaml"
+    valid_data = [{"id": "model-str", "endpoint": "http://ep-str"}]
+    valid_file.write_text(yaml.safe_dump(valid_data), encoding="utf-8")
+
+    configs = load_config_from_file(str(valid_file))
+    assert len(configs) == 1
+    assert configs[0].id == "model-str"
+
+
+def test_load_config_from_file_empty_list(tmp_path):
+    """Verifies loading a YAML file containing an empty list returns an empty list."""
+    empty_list_file = tmp_path / "empty_list.yaml"
+    empty_list_file.write_text(yaml.safe_dump([]), encoding="utf-8")
+
+    configs = load_config_from_file(empty_list_file)
+    assert configs == []
+
+
+def test_load_model_configs_empty_list():
+    """Verifies that an empty list returns an empty list without error."""
+    assert load_model_configs([]) == []
+
+
+def test_load_model_configs_non_dict_element():
+    """Verifies that non-dict elements inside the list trigger a ValidationError."""
+    with pytest.raises(ValidationError):
+        load_model_configs(["not-a-dict"])
+
+
+@pytest.mark.parametrize(
+    "invalid_payload",
+    [
+        {"id": "m1", "endpoint": "http://ep", "intended_tier": "invalid-tier"},
+        {"id": "m1", "endpoint": "http://ep", "max_context_tokens": "not-an-int"},
+    ]
+)
+def test_model_config_invalid_field_types(invalid_payload):
+    """Verifies that invalid enum values or type mismatches raise a ValidationError."""
+    with pytest.raises(ValidationError):
+        ModelConfig(**invalid_payload)

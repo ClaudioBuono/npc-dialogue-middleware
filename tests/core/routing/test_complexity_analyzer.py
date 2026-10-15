@@ -1,9 +1,11 @@
+from pydantic import BaseModel
 import pytest
 from unittest.mock import MagicMock
 from typing import Optional, Union
 from core.routing.complexity_analyzer import (
     ComplexityAnalyzer,
     ComplexityScore,
+    _ContextLengthScore,
     _COMMON_LENGTH_THRESHOLD_NAMES,
     _QUEST_ONLY_LENGTH_THRESHOLD_NAMES,
 )
@@ -11,6 +13,10 @@ from core.types.contexts import Dialogue, Quest, GameContext, NPCContext, Talkat
 from core.types.enums import ComplexityTier
 from core.routing.helpers import classify_score_to_complexity_tier
 
+class _RichnessProbe(BaseModel):
+    """Minimal model: one optional text field and one boolean flag."""
+    text_field: str | None = None
+    flag_field: bool = False
 
 # ------------------------------------------------------------------
 # Initialization & Validation Tests
@@ -126,7 +132,7 @@ def test_own_optional_fields_robust():
     dialogue_opts = analyzer._own_optional_fields(Dialogue)
     assert "must_use_expression" in dialogue_opts
     assert "more_info" in dialogue_opts
-    assert "has_options" in dialogue_opts
+    assert "number_of_options" in dialogue_opts
     
     # Quest optional fields (excluding inherited fields from Dialogue)
     quest_opts = analyzer._own_optional_fields(Quest, exclude_inherited_from=Dialogue)
@@ -172,33 +178,93 @@ def test_score_intent_behavioral():
 
 
 # ------------------------------------------------------------------
-# Manual Flag / Relation Override Tests
+# Context Length Scoring & Debug Tests
 # ------------------------------------------------------------------
 
-def test_score_manual_flag_behavioral():
-    """Verifies manual override scaling for high-importance narrative relationships."""
+def test_score_context_length_debug_and_saturation():
+    """Verifies _score_context_length_debug attributes, calculation, and clamping behavior."""
+    analyzer = ComplexityAnalyzer(
+        min_tokens=10.0,
+        max_tokens={"dialogue": 50.0, "quest": 100.0},
+        chars_per_token=4.0
+    )
 
+    # 1. Under minimum tokens: score clamps to 0.0
+    game_ctx_short = GameContext(epoch="E", environment="short", world_state="ok")
+    npc_ctx_short = NPCContext(
+        name="A", age=20, personality="P", context="C",
+        intent=Dialogue(), talkativeness=Talkativeness.AVERAGE,
+        main_character_relation="R"
+    )
+    # Total chars: len("E") + len("short") + len("ok") + len("A") + len("P") + len("C") + len("R") = 1+5+2+1+1+1+1 = 12
+    # 12 / 4 = 3 tokens <= min_tokens (10.0) -> score 0.0
+    debug_short = analyzer._score_context_length_debug(game_ctx_short, npc_ctx_short)
+    assert isinstance(debug_short, _ContextLengthScore)
+    assert debug_short.score == 0.0
+    assert debug_short.intent_kind == "dialogue"
+    assert debug_short.min_tokens == 10.0
+    assert debug_short.max_tokens == 50.0
+    assert analyzer._score_context_length(game_ctx_short, npc_ctx_short) == 0.0
+
+    # 2. Over maximum tokens: score clamps to 1.0
+    game_ctx_long = GameContext(epoch="E" * 200, environment="env" * 100, world_state="ws" * 100)
+    npc_ctx_long = NPCContext(
+        name="Name", age=30, personality="Personality", context="Context",
+        intent=Dialogue(), talkativeness=Talkativeness.AVERAGE,
+        main_character_relation="Relation"
+    )
+    debug_long = analyzer._score_context_length_debug(game_ctx_long, npc_ctx_long)
+    assert debug_long.score == 1.0
+    assert debug_long.estimated_tokens > 50.0
+    assert analyzer._score_context_length(game_ctx_long, npc_ctx_long) == 1.0
+
+    # 3. Quest intent applies quest max_tokens and sets intent_kind to 'quest'
+    npc_ctx_quest = NPCContext(
+        name="A", age=20, personality="P", context="C",
+        intent=Quest(objective="Do task"), talkativeness=Talkativeness.AVERAGE,
+        main_character_relation="R"
+    )
+    debug_quest = analyzer._score_context_length_debug(game_ctx_short, npc_ctx_quest)
+    assert debug_quest.intent_kind == "quest"
+    assert debug_quest.max_tokens == 100.0
+
+
+def test_context_length_score_frozen():
+    """Verifies that _ContextLengthScore is a frozen dataclass and cannot be modified."""
+    score_obj = _ContextLengthScore(
+        score=0.5, total_chars=100, estimated_tokens=25.0,
+        min_tokens=10.0, max_tokens=50.0, intent_kind="dialogue"
+    )
+    with pytest.raises((AttributeError, TypeError)):
+        score_obj.score = 0.8
+
+
+def test_max_tokens_for_intent():
+    """Verifies that _max_tokens_for_intent retrieves the respective ceiling for Dialogue vs Quest."""
+    analyzer = ComplexityAnalyzer(max_tokens={"dialogue": 250.0, "quest": 400.0})
+    assert analyzer._max_tokens_for_intent(Dialogue()) == 250.0
+    assert analyzer._max_tokens_for_intent(Quest(objective="Save village")) == 400.0
+
+
+def test_text_fields_length_with_non_string_types_and_exclusions():
+    """Verifies that non-string values (int, bool, Enum, None) are ignored and exclusions respected."""
     analyzer = ComplexityAnalyzer()
-    
-    def create_npc_with_relation(relation: str):
-        return NPCContext(
-            name="Grog",
-            age=35,
-            personality="Angry",
-            context="The Wilderness",
-            intent=Dialogue(),
-            talkativeness=Talkativeness.AVERAGE,
-            main_character_relation=relation
-        )
+    game_ctx = GameContext(
+        epoch="Modern", environment="City", world_state="Normal",
+        main_character_description=None
+    )
+    # len("Modern") = 6, len("City") = 4, len("Normal") = 6 -> total = 16
+    assert analyzer._text_fields_length(game_ctx) == 16
+    # With exclusion of "environment": 6 + 6 = 12
+    assert analyzer._text_fields_length(game_ctx, exclude={"environment"}) == 12
 
-    # Important/critical narrative connections must force 1.0 (highest tier priority)
-    for critical_relation in ["hostile", "romantic interest", "nemesis"]:
-        assert analyzer._score_manual_flag(create_npc_with_relation(critical_relation)) == 1.0
-        assert analyzer._score_manual_flag(create_npc_with_relation(critical_relation.upper())) == 1.0  # Case insensitivity
 
-    # Standard/common connections must remain neutral at 0.0
-    for standard_relation in ["friend", "neutral", "acquaintance"]:
-        assert analyzer._score_manual_flag(create_npc_with_relation(standard_relation)) == 0.0
+def test_score_richness_empty_fields():
+    """Verifies that _score_richness safely returns 0.0 when no checkable fields exist."""
+    analyzer = ComplexityAnalyzer()
+    d = Dialogue()
+    assert analyzer._score_richness(d, set()) == 0.0
+    assert analyzer._score_richness(d, {"type"}) == 0.0
 
 
 # ------------------------------------------------------------------
@@ -210,7 +276,8 @@ def test_score_intent_richness_behavioral():
     Verifies structural richness calculations using algorithmic invariants:
     1. Zero-baseline: Empty optional parameters yield a score of 0.0.
     2. Monotonicity: Accumulating populated optional parameters increases the score.
-    3. Weighted ratio: Boolean generation flags weigh strictly more than plain text inputs.
+    3. Weighted ratio: Boolean flags weigh flag_field_weight times a plain text field.
+    4. Non-bool fields (e.g. number_of_options: int) weigh like text fields.
     """
 
     flag_weight = 2.0
@@ -223,23 +290,28 @@ def test_score_intent_richness_behavioral():
     # 2. Monotonicity Invariant
     d_one_param = Dialogue(must_use_expression="Sarcastic")
     d_two_params = Dialogue(must_use_expression="Sarcastic", more_info="In a hurry")
-    
+
     score_empty = analyzer._score_intent_richness(d_empty)
     score_low = analyzer._score_intent_richness(d_one_param)
     score_high = analyzer._score_intent_richness(d_two_params)
-    
+
     assert score_empty == 0.0
     assert 0.0 < score_low < score_high <= 1.0
 
-    # 3. Relative Weights Invariant
-    # A single bool flag should yield exactly flag_field_weight * score of a single text field
-    d_text_only = Dialogue(must_use_expression="Sarcastic")  # weight = 1.0
-    d_flag_only = Dialogue(has_options=True)                 # weight = flag_field_weight (2.0)
+    # 3. Relative Weights Invariant (isolated from the real intent models)
+    fields = {"text_field", "flag_field"}
+    score_text = analyzer._score_richness(_RichnessProbe(text_field="x"), fields)    # 1 / (1 + 2)
+    score_flag = analyzer._score_richness(_RichnessProbe(flag_field=True), fields)   # 2 / (1 + 2)
 
-    score_text = analyzer._score_intent_richness(d_text_only)
-    score_flag = analyzer._score_intent_richness(d_flag_only)
+    assert score_flag == pytest.approx(score_text * flag_weight)
 
-    assert pytest.approx(score_flag) == score_text * flag_weight
+    # 4. Non-bool fields are NOT flags: number_of_options (int) weighs like a text field
+    d_text_only = Dialogue(must_use_expression="Sarcastic")
+    d_options_only = Dialogue(number_of_options=3)
+
+    assert analyzer._score_intent_richness(d_options_only) == pytest.approx(
+        analyzer._score_intent_richness(d_text_only)
+    )
 
 
 # ------------------------------------------------------------------
@@ -268,7 +340,7 @@ def test_analyze_behavioral():
     dialogue = Dialogue(
         must_use_expression="Nervous",
         more_info="Wants to escape",
-        has_options=True
+        number_of_options=3
     )
 
     npc_ctx = NPCContext(
@@ -304,3 +376,80 @@ def test_analyze_behavioral():
 
     # Invariant 4: Completeness of breakdown details
     assert set(score.breakdown.keys()) == set(analyzer._WEIGHTS.keys())
+
+
+def test_score_intent_richness_quest_behavioral():
+    """
+    Verifies that Quest intent richness accumulates both Dialogue and Quest-specific optional fields,
+    and respects the flag_field_weight for boolean flags (e.g. has_choice).
+    """
+    analyzer = ComplexityAnalyzer(flag_field_weight=2.0)
+
+    # 1. Quest with only required field (objective) -> 0.0 richness
+    q_bare = Quest(objective="Find artifact")
+    assert analyzer._score_intent_richness(q_bare) == 0.0
+
+    # 2. Quest with Quest-specific text fields populated (name, location, reward)
+    q_with_quest_fields = Quest(
+        objective="Find artifact",
+        name="The Ancient Relic",
+        location="Lost Temple",
+        reward="500 Gold"
+    )
+    score_quest_fields = analyzer._score_intent_richness(q_with_quest_fields)
+    assert 0.0 < score_quest_fields < 1.0
+
+    # 3. Quest with both Dialogue optional fields AND Quest optional fields
+    q_rich = Quest(
+        objective="Find artifact",
+        must_use_expression="Be careful",
+        more_info="Traps everywhere",
+        number_of_options=3,
+        name="The Ancient Relic",
+        location="Lost Temple",
+        reward="500 Gold",
+        has_choice=True
+    )
+    score_rich = analyzer._score_intent_richness(q_rich)
+    assert score_rich > score_quest_fields
+    assert score_rich <= 1.0
+
+
+def test_analyze_quest_integration():
+    """Verifies analyze() execution when the request intent is a Quest."""
+    analyzer = ComplexityAnalyzer(
+        min_tokens=5,
+        max_tokens={"dialogue": 30, "quest": 60},
+        chars_per_token=3.0,
+        flag_field_weight=2.0
+    )
+
+    game_ctx = GameContext(epoch="Fantasy", environment="Kingdom", world_state="War")
+    quest = Quest(
+        objective="Slay the dragon",
+        name="Dragon Slayer",
+        location="Dragon Peak",
+        reward="Dragon Armor",
+        has_choice=True
+    )
+    npc_ctx = NPCContext(
+        name="Eldrin",
+        age=60,
+        personality="Wise",
+        context="Throne Room",
+        intent=quest,
+        talkativeness=Talkativeness.AVERAGE,
+        main_character_relation="Ally"
+    )
+
+    score = analyzer.analyze(game_ctx, npc_ctx)
+
+    assert isinstance(score, ComplexityScore)
+    assert 0.0 <= score.value <= 1.0
+    # Quest intent weight is 0.70 (compared to dialogue 0.30)
+    assert score.breakdown["intent_weight"] == 0.70
+    expected_weighted_total = sum(
+        score.breakdown[key] * analyzer._WEIGHTS[key] for key in score.breakdown
+    )
+    assert score.value == round(expected_weighted_total, 3)
+    assert score.tier == classify_score_to_complexity_tier(score.value)

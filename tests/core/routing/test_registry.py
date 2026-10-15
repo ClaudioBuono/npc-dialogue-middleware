@@ -113,3 +113,92 @@ def test_get_best_for_tier():
     # No HIGH models registered
     best_high = registry.get_best_for_tier(ComplexityTier.HIGH)
     assert best_high is None
+
+
+def test_set_models_empty_list():
+    """Verifies that passing an empty list clears ranked models and does not error."""
+    registry = ModelRegistry()
+    registry.set_models([])
+    assert registry.get_ranked_models() == []
+
+
+def test_set_models_none_uses_internal_configs():
+    """Verifies that calling set_models with None uses the pre-loaded _models_configs."""
+    registry = ModelRegistry()
+    default_cfg = ModelConfig(id="default-model", endpoint="http://localhost", intended_tier=ComplexityTier.LOW)
+    registry._models_configs = [default_cfg]
+
+    registry.set_models(None)
+    ranked = registry.get_ranked_models()
+    assert len(ranked) == 1
+    assert ranked[0].config.id == "default-model"
+
+
+def test_set_models_single_model_without_intended_tier():
+    """Verifies fallback score (0.6 - MEDIUM) when a single model lacks intended_tier."""
+    registry = ModelRegistry()
+    model = ModelConfig(id="single-no-tier", endpoint="http://localhost:8000/v1")
+
+    registry.set_models([model])
+    ranked = registry.get_ranked_models()
+    assert len(ranked) == 1
+    assert ranked[0].config.id == "single-no-tier"
+    assert ranked[0].score == 0.6
+
+
+def test_validate_tiers_declared_multiple_missing():
+    """Verifies error reporting when multiple models are missing intended_tier."""
+    registry = ModelRegistry()
+    models = [
+        ModelConfig(id="m1-missing", endpoint="http://ep1"),
+        ModelConfig(id="m2-missing", endpoint="http://ep2"),
+    ]
+    with pytest.raises(RoutingConfigError) as excinfo:
+        registry.set_models(models, profiler=False)
+
+    error_str = str(excinfo.value)
+    assert "m1-missing" in error_str
+    assert "m2-missing" in error_str
+
+
+def test_print_ranked_models_empty_and_populated():
+    """Verifies _print_ranked_models formatting with empty state and optional fields."""
+    registry = ModelRegistry()
+
+    # 1. Empty state
+    registry._ranked_models = []
+    registry._print_ranked_models()
+
+    # 2. Populated state with None fields and formatted max context tokens
+    client = MagicMock()
+    m1 = ModelConfig(id="m1", endpoint="http://ep1", intended_tier=None, max_context_tokens=None)
+    m2 = ModelConfig(id="m2", endpoint="http://ep2", intended_tier=ComplexityTier.HIGH, max_context_tokens=128000)
+    registry._ranked_models = [
+        RankedModel(config=m2, score=0.9, client=client),
+        RankedModel(config=m1, score=0.6, client=client),
+    ]
+    registry._print_ranked_models()
+
+
+def test_get_best_for_tier_empty_registry():
+    """Verifies that querying an empty registry returns None."""
+    registry = ModelRegistry()
+    registry._ranked_models = []
+    assert registry.get_best_for_tier(ComplexityTier.LOW) is None
+    assert registry.get_best_for_tier(ComplexityTier.MEDIUM) is None
+    assert registry.get_best_for_tier(ComplexityTier.HIGH) is None
+
+
+def test_registry_new_initialization():
+    """Verifies that __new__ correctly resolves config and initializes attributes when _instance is None."""
+    orig_instance = ModelRegistry._instance
+    try:
+        ModelRegistry._instance = None
+        with patch("core.routing.registry.resolve_config_file", return_value="dummy.yaml"), \
+             patch("core.routing.registry.load_config_from_file", return_value=[]):
+            inst = ModelRegistry()
+            assert inst._ranked_models == []
+            assert inst._models_configs == []
+    finally:
+        ModelRegistry._instance = orig_instance
+

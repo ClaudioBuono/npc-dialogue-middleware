@@ -144,3 +144,33 @@ def test_router_select_model_integration():
     with patch.object(router.complexity_analyzer, "analyze", return_value=score_high):
         client = router.select_model(game_ctx, npc_ctx)
         assert client is m_high.client
+
+    # Analyze mock returning MEDIUM tier
+    m_med = RankedModel(config=ModelConfig(id="med", endpoint="http://m", intended_tier=ComplexityTier.MEDIUM), score=0.6, client=MagicMock())
+    ModelRegistry()._ranked_models = [m_high, m_med, m_low]
+    score_med = ComplexityScore(value=0.5, tier=ComplexityTier.MEDIUM, breakdown={})
+    with patch.object(router.complexity_analyzer, "analyze", return_value=score_med):
+        client = router.select_model(game_ctx, npc_ctx)
+        assert client is m_med.client
+
+
+def test_router_handle_medium_complexity_midpoint_tie():
+    """Verifies that an exact midpoint tie defaults to the LOW branch (high_diff < low_diff is False)."""
+    from core.configuration.thresholds import LOW_THRESHOLD, HIGH_THRESHOLD
+    router = LLMRouter()
+
+    m_low = RankedModel(config=ModelConfig(id="low", endpoint="http://l", intended_tier=ComplexityTier.LOW), score=0.3, client=MagicMock())
+    m_high = RankedModel(config=ModelConfig(id="high", endpoint="http://h", intended_tier=ComplexityTier.HIGH), score=0.9, client=MagicMock())
+
+    midpoint = (LOW_THRESHOLD + HIGH_THRESHOLD) / 2.0
+    # No MEDIUM model available, both HIGH and LOW present -> tie defaults to LOW
+    ModelRegistry()._ranked_models = [m_high, m_low]
+    assert router._handle_medium_complexity(midpoint) is m_low
+
+
+def test_router_init():
+    """Verifies that LLMRouter instantiates its ComplexityAnalyzer correctly."""
+    router = LLMRouter()
+    assert router.complexity_analyzer is not None
+    assert router.complexity_analyzer._chars_per_token > 0
+
